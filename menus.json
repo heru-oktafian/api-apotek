@@ -1,0 +1,1083 @@
+{
+    "status": "success",
+    "message": "Get All User Roles Success",
+    "data": [
+        {
+            "user_role": "administrator",
+            "details":[
+                {
+                    "group_menu": "Settings",
+                    "title": "Profile",
+                    "url":"/api/profile",
+                    "method":"GET",
+                    "access":"read"
+                    
+                },
+                {
+                    "group_menu": "Dashboard",
+                    "title": "Dashboard",
+                    "url":"/api/dashboard",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Master",
+                    "title": "Satuan",
+                    "url":"/api/units",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Master",
+                    "title":"Konversi Satuan",
+                    "url":"/api/unit-conversions",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Master",
+                    "title":"Kategori Produk",
+                    "url":"/api/product-categories",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Master",
+                    "title":"Produk",
+                    "url":"/api/products",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Master",
+                    "title":"Kategori Supplier",
+                    "url":"/api/supplier-categories",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Master",
+                    "title":"Supplier",
+                    "url":"/api/suppliers",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
+                    "title":"Penjualan",
+                    "url":"/api/sales",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
+                    "title":"Retur Penjualan",
+                    "url":"/api/sale-returns",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
+                    "title":"Pembelian",
+                    "url":"/api/purchases",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
+                    "title":"Retur Pembelian",
+                    "url":"/api/buy-returns",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
+                    "title":"Pengeluaran",
+                    "url":"/api/expenses",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
+                    "title":"Pemasukan Lain",
+                    "url":"/api/another-incomes",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Finance",
+                    "title":"Stok Awal",
+                    "url":"/api/first-stocks",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Finance",
+                    "title":"Stok Opname",
+                    "url":"/api/opnames",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Laporan",
+                    "title":"Laporan Bulanan",
+                    "url":"/api/reports/profit-by-month",
+                    "access":"get_by_month"
+                },
+                {
+                    "group_menu": "Laporan",
+                    "title":"Neraca Saldo",
+                    "url":"/api/reports/neraca-saldo",
+                    "method":"GET",
+                    "access":"get_by_month"
+                },
+                {
+                    "group_menu": "Laporan",
+                    "title":"Laporan Aset",
+                    "url":"/api/daily_asset",
+                    "method":"GET",
+                    "access":"get_by_month"
+                },
+                {
+                    "group_menu": "Membership",
+                    "title":"Kategori Member",
+                    "url":"/api/member-categories",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Membership",
+                    "title":"Members",
+                    "url":"/api/members",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "User Manage",
+                    "title":"Users",
+                    "url":"/api/users",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "User Manage",
+                    "title":"Cabang",
+                    "url":"/api/branches",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                }
+            ]
+        },
+        {
+            "user_role": "superadmin",
+            "details":[
+                {
+                    "group_menu": "Settings",
+                    "title": "Profile",
+                    "url":"/api/profile",
+                    "method":"GET",
+                    "access":"read"
+                    
+                },
+                {
+                    "group_menu": "Dashboard",
+                    "title": "Dashboard",
+                    "url":"/api/dashboard",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Master",
+                    "title": "Satuan",
+                    "url":"/api/units",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Master",
+                    "title":"Konversi Satuan",
+                    "url":"/api/unit-conversions",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Master",
+                    "title":"Kategori Produk",
+                    "url":"/api/product-categories",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Master",
+                    "title":"Produk",
+                    "url":"/api/products",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Master",
+                    "title":"Kategori Supplier",
+                    "url":"/api/supplier-categories",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Master",
+                    "title":"Supplier",
+                    "url":"/api/suppliers",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
+                    "title":"Penjualan",
+                    "url":"/api/sales",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
+                    "title":"Retur Penjualan",
+                    "url":"/api/sale-returns",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
+                    "title":"Pembelian",
+                    "url":"/api/purchases",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
+                    "title":"Retur Pembelian",
+                    "url":"/api/buy-returns",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
+                    "title":"Pengeluaran",
+                    "url":"/api/expenses",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
+                    "title":"Pemasukan Lain",
+                    "url":"/api/another-incomes",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Finance",
+                    "title":"Stok Awal",
+                    "url":"/api/first-stocks",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Finance",
+                    "title":"Stok Opname",
+                    "url":"/api/opnames",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Laporan",
+                    "title":"Laporan Bulanan",
+                    "url":"/api/reports/profit-by-month",
+                    "access":"get_by_month"
+                },
+                {
+                    "group_menu": "Laporan",
+                    "title":"Neraca Saldo",
+                    "url":"/api/reports/neraca-saldo",
+                    "method":"GET",
+                    "access":"get_by_month"
+                },
+                {
+                    "group_menu": "Laporan",
+                    "title":"Laporan Aset",
+                    "url":"/api/daily_asset",
+                    "method":"GET",
+                    "access":"get_by_month"
+                },
+                {
+                    "group_menu": "Membership",
+                    "title":"Kategori Member",
+                    "url":"/api/member-categories",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Membership",
+                    "title":"Members",
+                    "url":"/api/members",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "User Manage",
+                    "title":"Users",
+                    "url":"/api/users",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                }
+            ]
+        },
+        {
+            "user_role": "finance",
+            "details":[
+                {
+                    "group_menu": "Settings",
+                    "title": "Profile",
+                    "url":"/api/profile",
+                    "method":"GET",
+                    "access":"read"
+                    
+                },
+                {
+                    "group_menu": "Dashboard",
+                    "title": "Dashboard",
+                    "url":"/api/dashboard",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Master",
+                    "title": "Satuan",
+                    "url":"/api/units",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Master",
+                    "title":"Konversi Satuan",
+                    "url":"/api/unit-conversions",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Master",
+                    "title":"Kategori Produk",
+                    "url":"/api/product-categories",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Master",
+                    "title":"Produk",
+                    "url":"/api/products",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Master",
+                    "title":"Kategori Supplier",
+                    "url":"/api/supplier-categories",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Master",
+                    "title":"Supplier",
+                    "url":"/api/suppliers",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Master",
+                    "title":"Produk Supplier",
+                    "url":"/api/supplier-products",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
+                    "title":"Penjualan",
+                    "url":"/api/sales",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
+                    "title":"Retur Penjualan",
+                    "url":"/api/sale-returns",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
+                    "title":"Pembelian",
+                    "url":"/api/purchases",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
+                    "title":"Retur Pembelian",
+                    "url":"/api/buy-returns",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
+                    "title":"Pengeluaran",
+                    "url":"/api/expenses",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
+                    "title":"Pemasukan Lain",
+                    "url":"/api/another-incomes",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Finance",
+                    "title":"Stok Awal",
+                    "url":"/api/first-stocks",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Finance",
+                    "title":"Stok Opname",
+                    "url":"/api/opnames",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Laporan",
+                    "title":"Laporan Bulanan",
+                    "url":"/api/reports/profit-by-month",
+                    "access":"get_by_month"
+                },
+                {
+                    "group_menu": "Laporan",
+                    "title":"Neraca Saldo",
+                    "url":"/api/reports/neraca-saldo",
+                    "method":"GET",
+                    "access":"get_by_month"
+                },
+                {
+                    "group_menu": "Laporan",
+                    "title":"Laporan Aset",
+                    "url":"/api/daily_asset",
+                    "method":"GET",
+                    "access":"get_by_month"
+                },
+                {
+                    "group_menu": "Membership",
+                    "title":"Kategori Member",
+                    "url":"/api/member-categories",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Membership",
+                    "title":"Members",
+                    "url":"/api/members",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                }
+            ]
+        },
+        {
+            "user_role": "operator",
+            "details":[
+                {
+                    "group_menu": "Settings",
+                    "title": "Profile",
+                    "url":"/api/profile",
+                    "method":"GET",
+                    "access":"read"
+                    
+                },
+                {
+                    "group_menu": "Dashboard",
+                    "title": "Dashboard",
+                    "url":"/api/dashboard",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },                
+                {
+                    "group_menu": "Master",
+                    "title":"Produk",
+                    "url":"/api/products",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Master",
+                    "title":"Produk Supplier",
+                    "url":"/api/supplier-products",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
+                    "title":"Penjualan",
+                    "url":"/api/sales",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
+                    "title":"Retur Penjualan",
+                    "url":"/api/sale-returns",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
+                    "title":"Pembelian",
+                    "url":"/api/purchases",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
+                    "title":"Retur Pembelian",
+                    "url":"/api/buy-returns",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
+                    "title":"Pengeluaran",
+                    "url":"/api/expenses",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
+                    "title":"Pemasukan Lain",
+                    "url":"/api/another-incomes",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Finance",
+                    "title":"Stok Opname",
+                    "url":"/api/opnames",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Laporan",
+                    "title":"Laporan Bulanan",
+                    "url":"/api/reports/profit-by-month",
+                    "access":"get_by_month"
+                },
+                {
+                    "group_menu": "Laporan",
+                    "title":"Neraca Saldo",
+                    "url":"/api/reports/neraca-saldo",
+                    "method":"GET",
+                    "access":"get_by_month"
+                },
+                {
+                    "group_menu": "Laporan",
+                    "title":"Laporan Aset",
+                    "url":"/api/daily_asset",
+                    "method":"GET",
+                    "access":"get_by_month"
+                },
+                {
+                    "group_menu": "Membership",
+                    "title":"Members",
+                    "url":"/api/members",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                }
+            ]
+        },
+        {
+            "user_role": "cashier",
+            "details":[
+                {
+                    "group_menu": "Settings",
+                    "title": "Profile",
+                    "url":"/api/profile",
+                    "method":"GET",
+                    "access":"read"
+                    
+                },
+                {
+                    "group_menu": "Dashboard",
+                    "title": "Dashboard",
+                    "url":"/api/dashboard",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },                   
+                {
+                    "group_menu": "Master",
+                    "title":"Produk Supplier",
+                    "url":"/api/supplier-products",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
+                    "title":"Penjualan",
+                    "url":"/api/sales",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
+                    "title":"Retur Penjualan",
+                    "url":"/api/sale-returns",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
+                    "title":"Pembelian",
+                    "url":"/api/purchases",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
+                    "title":"Retur Pembelian",
+                    "url":"/api/buy-returns",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
+                    "title":"Pengeluaran",
+                    "url":"/api/expenses",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
+                    "title":"Pemasukan Lain",
+                    "url":"/api/another-incomes",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Finance",
+                    "title":"Stok Opname",
+                    "url":"/api/opnames",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Laporan",
+                    "title":"Laporan Bulanan",
+                    "url":"/api/reports/profit-by-month",
+                    "access":"get_by_month"
+                },
+                {
+                    "group_menu": "Laporan",
+                    "title":"Neraca Saldo",
+                    "url":"/api/reports/neraca-saldo",
+                    "method":"GET",
+                    "access":"get_by_month"
+                },
+                {
+                    "group_menu": "Laporan",
+                    "title":"Laporan Aset",
+                    "url":"/api/daily_asset",
+                    "method":"GET",
+                    "access":"get_by_month"
+                },
+                {
+                    "group_menu": "Membership",
+                    "title":"Members",
+                    "url":"/api/members",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                }
+            ]
+        }
+    ]
+}

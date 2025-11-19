@@ -3,6 +3,6 @@
 *.log
 *.toml
 *pro-retail
-*api-retail
+*api-apotek
 *go.mod
 !.env_example

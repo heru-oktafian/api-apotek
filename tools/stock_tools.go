@@ -3,8 +3,8 @@ package tools
 import (
 	"errors"
 
-	"github.com/heru-oktafian/api-retail/models"
-	"github.com/heru-oktafian/api-retail/reports"
+	"github.com/heru-oktafian/api-apotek/models"
+	"github.com/heru-oktafian/api-apotek/reports"
 	"gorm.io/gorm"
 )
 

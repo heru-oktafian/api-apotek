@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/heru-oktafian/api-retail/models"
+	"github.com/heru-oktafian/api-apotek/models"
 	"github.com/heru-oktafian/scafold/utils"
 	"gorm.io/gorm"
 )

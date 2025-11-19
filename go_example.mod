@@ -1,4 +1,4 @@
-module github.com/heru-oktafian/api-retail
+module github.com/heru-oktafian/api-apotek
 
 go 1.25.1
 

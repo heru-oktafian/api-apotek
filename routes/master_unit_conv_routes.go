@@ -3,7 +3,7 @@ package routes
 import (
 	"os"
 
-	"github.com/heru-oktafian/api-retail/controllers"
+	"github.com/heru-oktafian/api-apotek/controllers"
 	"github.com/heru-oktafian/scafold/framework"
 	"github.com/heru-oktafian/scafold/middlewares"
 )

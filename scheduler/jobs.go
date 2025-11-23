@@ -9,7 +9,7 @@ import (
 	"github.com/heru-oktafian/scafold/helpers"
 	"gorm.io/gorm"
 
-	"github.com/heru-oktafian/api-retail/models"
+	"github.com/heru-oktafian/api-apotek/models"
 )
 
 // Contoh: Backup DB pake pg_dump

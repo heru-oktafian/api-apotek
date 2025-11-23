@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/heru-oktafian/api-retail/models"
-	"github.com/heru-oktafian/api-retail/reports"
-	"github.com/heru-oktafian/api-retail/tools"
+	"github.com/heru-oktafian/api-apotek/models"
+	"github.com/heru-oktafian/api-apotek/reports"
+	"github.com/heru-oktafian/api-apotek/tools"
 	"github.com/heru-oktafian/scafold/config"
 	"github.com/heru-oktafian/scafold/framework"
 	"github.com/heru-oktafian/scafold/helpers"

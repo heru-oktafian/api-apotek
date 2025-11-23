@@ -8,6 +8,9 @@ type Product struct {
 	SKU               string    `gorm:"type:varchar(100);not null" json:"sku" validate:"required"`
 	Name              string    `gorm:"type:varchar(255);not null" json:"name" validate:"required"`
 	Description       string    `gorm:"type:text;" json:"description"`
+	Ingredients       string    `gorm:"type:text;" json:"ingredients"`
+	Dosage            string    `gorm:"type:text;" json:"dosage"`
+	SideAffection     string    `gorm:"type:text;" json:"side_affection"`
 	UnitId            string    `gorm:"type:varchar(15);not null" json:"unit_id" validate:"required"`
 	Stock             int       `gorm:"type:int;not null;default:0" json:"stock"`
 	PurchasePrice     int       `gorm:"type:int;not null;default:0" json:"purchase_price" validate:"required"`
@@ -24,6 +27,9 @@ type ProductAll struct {
 	SKU                 string    `gorm:"type:varchar(100);not null" json:"sku" validate:"required"`
 	Name                string    `gorm:"type:varchar(255);not null" json:"name" validate:"required"`
 	Description         string    `gorm:"type:text;" json:"description"`
+	Ingredients         string    `gorm:"type:text;" json:"ingredients"`
+	Dosage              string    `gorm:"type:text;" json:"dosage"`
+	SideAffection       string    `gorm:"type:text;" json:"side_affection"`
 	UnitName            string    `gorm:"type:varchar(100);not null" json:"unit_name" validate:"required"`
 	Stock               int       `gorm:"type:int;not null;default:0" json:"stock"`
 	PurchasePrice       int       `gorm:"type:int;not null;default:0" json:"purchase_price" validate:"required"`
@@ -39,6 +45,9 @@ type ProductDetail struct {
 	SKU                 string    `gorm:"type:varchar(100);not null" json:"sku" validate:"required"`
 	Name                string    `gorm:"type:varchar(255);not null" json:"name" validate:"required"`
 	Description         string    `gorm:"type:text;" json:"description"`
+	Ingredients         string    `gorm:"type:text;" json:"ingredients"`
+	Dosage              string    `gorm:"type:text;" json:"dosage"`
+	SideAffection       string    `gorm:"type:text;" json:"side_affection"`
 	UnitId              string    `gorm:"type:varchar(15);not null" json:"unit_id" validate:"required"`
 	UnitName            string    `gorm:"type:varchar(100);not null" json:"unit_name" validate:"required"`
 	Stock               int       `gorm:"type:int;not null;default:0" json:"stock"`

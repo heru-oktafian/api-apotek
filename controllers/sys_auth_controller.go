@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/heru-oktafian/api-retail/models"
+	"github.com/heru-oktafian/api-apotek/models"
 	"github.com/heru-oktafian/scafold/config"
 	"github.com/heru-oktafian/scafold/framework"
 	"github.com/heru-oktafian/scafold/middlewares"
@@ -217,7 +217,7 @@ func GetProfile(c *framework.Ctx) error {
 	// Melakukan LEFT OUTER JOIN menggunakan GORM
 	if err := config.DB.
 		Table("user_branches usrbrc").
-		Select("usrbrc.user_id AS user_id, usr.name AS profile_name, usrbrc.branch_id AS branch_id, brc.branch_name AS branch_name, brc.address, brc.phone, brc.email, brc.bank_name, brc.account_name, brc.account_number, brc.tax_percentage, brc.journal_method, brc.default_member AS default_member, mbr.name AS member_name, brc.branch_status, brc.owner_id, brc.owner_name").
+		Select("usrbrc.user_id AS user_id, usr.name AS profile_name, usrbrc.branch_id AS branch_id, brc.branch_name AS branch_name, brc.address, brc.phone, brc.email, brc.sia_id, brc.sia_name, brc.psa_id, brc.psa_name, brc.sipa, brc.sipa_name, brc.aping_id, brc.aping_name, brc.bank_name, brc.account_name, brc.account_number, brc.tax_percentage, brc.journal_method, brc.default_member AS default_member, mbr.name AS member_name, brc.branch_status").
 		Joins("LEFT JOIN users usr ON usr.user_id = usrbrc.user_id").
 		Joins("LEFT JOIN branches brc ON brc.id = usrbrc.branch_id").
 		Joins("LEFT JOIN members mbr ON mbr.id = brc.default_member").

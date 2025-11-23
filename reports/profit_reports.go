@@ -1,7 +1,7 @@
 package reports
 
 import (
-	"github.com/heru-oktafian/api-retail/models"
+	"github.com/heru-oktafian/api-apotek/models"
 	"gorm.io/gorm"
 )
 

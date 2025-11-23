@@ -5,9 +5,9 @@ import (
 	os "os"
 	"strconv"
 
-	models "github.com/heru-oktafian/api-retail/models"
-	routes "github.com/heru-oktafian/api-retail/routes"
-	scheduler "github.com/heru-oktafian/api-retail/scheduler"
+	models "github.com/heru-oktafian/api-apotek/models"
+	routes "github.com/heru-oktafian/api-apotek/routes"
+	scheduler "github.com/heru-oktafian/api-apotek/scheduler"
 	config "github.com/heru-oktafian/scafold/config"
 	env "github.com/heru-oktafian/scafold/env"
 	framework "github.com/heru-oktafian/scafold/framework"

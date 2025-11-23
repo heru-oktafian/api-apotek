@@ -54,8 +54,8 @@ Pastikan Anda telah menginstal yang berikut ini:
 
 1.  **Clone** repositori ini:
     ```bash
-    git clone git@github.com:heru-oktafian/api-retail.git
-    cd api-retail
+     git clone git@github.com:heru-oktafian/api-apotek.git
+     cd api-apotek
     ```
 
 2.  **Siapkan Database:**

@@ -53,7 +53,7 @@ func GetProduct(c *framework.Ctx) error {
 	var AllProduct []models.ProductDetail
 	if err := config.DB.
 		Table("products pro").
-		Select("pro.id,pro.sku,pro.name,pro.description,pro.unit_id AS unit_id,pro.stock,pro.purchase_price,pro.expired_date,pro.sales_price,pro.alternate_price,pro.product_category_id,pc.name AS product_category_name,un.name AS unit_name,pro.branch_id").
+		Select("pro.id,pro.sku,pro.name,pro.description, pro.ingredients, pro.dosage, pro.side_affection, pro.unit_id AS unit_id,pro.stock,pro.purchase_price,pro.expired_date,pro.sales_price, pro.alternate_price, pro.product_category_id,pc.name AS product_category_name,un.name AS unit_name,pro.branch_id").
 		Joins("LEFT JOIN product_categories pc ON pc.id = pro.product_category_id").
 		Joins("LEFT JOIN units un ON un.id = pro.unit_id").
 		Where("pro.id = ?", id).
@@ -88,7 +88,7 @@ func GetAllProduct(c *framework.Ctx) error {
 
 	// Query dasar
 	query := config.DB.Table("products pro").
-		Select("pro.id,pro.sku,pro.name,pro.description, pro.unit_id, un.name AS unit_name,pro.stock,pro.purchase_price,pro.sales_price,pro.alternate_price,pro.expired_date, pro.product_category_id, pc.name AS product_category_name").
+		Select("pro.id,pro.sku,pro.name,pro.description, pro.ingredients, pro.dosage, pro.side_affection, pro.unit_id, un.name AS unit_name,pro.stock,pro.purchase_price,pro.sales_price,pro.alternate_price,pro.expired_date, pro.product_category_id, pc.name AS product_category_name").
 		Joins("LEFT JOIN product_categories pc ON pc.id = pro.product_category_id").
 		Joins("LEFT JOIN units un ON un.id = pro.unit_id").
 		Where("pro.branch_id = ?", branch_id)

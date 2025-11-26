@@ -428,9 +428,8 @@ func CmbSale(c *framework.Ctx) error {
 
 	branchID, _ := middlewares.GetBranchID(c.Request)
 
-	// Ambil parameter page dan search dari query URL
+	// Ambil parameter search dan month dari query URL
 	search := strings.TrimSpace(c.Query("search"))
-
 	month := strings.TrimSpace(c.Query("month"))
 
 	// Jika month kosong, isi dengan bulan ini (format YYYY-MM)
@@ -438,9 +437,16 @@ func CmbSale(c *framework.Ctx) error {
 		month = nowWIB.Format("2006-01")
 	}
 
-	var sales []models.Sales
+	// Gunakan struct ringan hanya dengan kolom yang dibutuhkan untuk mengurangi I/O dan marshal
+	var sales []struct {
+		ID        string    `json:"id"`
+		SaleDate  time.Time `json:"sale_date"`
+		TotalSale int       `json:"total_sale"`
+		MemberID  string    `json:"member_id"`
+	}
 
-	query := config.DB.Debug().Table("sales").
+	query := config.DB.Table("sales").
+		Select("id, sale_date, total_sale, member_id").
 		Where("branch_id = ?", branchID)
 
 	// Filter by month (sale_date)
@@ -454,22 +460,17 @@ func CmbSale(c *framework.Ctx) error {
 		query = query.Where("sale_date BETWEEN ? AND ?", startDate, endDate)
 	}
 
-	// Optional search by sales.id
+	// Optional search by sales.id (tetap case-insensitive seperti semula)
 	if search != "" {
-		search = strings.ToLower(search)
-		query = query.Where("LOWER(id) LIKE ?", "%"+search+"%")
+		searchLower := strings.ToLower(search)
+		query = query.Where("LOWER(id) LIKE ?", "%"+searchLower+"%")
 	}
 
 	query = query.Order("sale_date DESC")
 
-	if err := query.Find(&sales).Error; err != nil {
+	if err := query.Scan(&sales).Error; err != nil {
 		return responses.JSONResponse(c, http.StatusInternalServerError, "Gagal mengambil data penjualan", err.Error())
 	}
 
-	return responses.JSONResponse(
-		c,
-		http.StatusOK,
-		"Data penjualan berhasil diambil",
-		sales,
-	)
+	return responses.JSONResponse(c, http.StatusOK, "Data penjualan berhasil diambil", sales)
 }

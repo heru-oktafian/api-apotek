@@ -440,7 +440,7 @@ func CmbSale(c *framework.Ctx) error {
 
 	var sales []models.Sales
 
-	query := config.DB.Table("sales").
+	query := config.DB.Debug().Table("sales").
 		Where("branch_id = ?", branchID)
 
 	// Filter by month (sale_date)

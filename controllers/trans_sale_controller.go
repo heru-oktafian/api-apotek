@@ -356,7 +356,7 @@ func UpdateSale(c *framework.Ctx) error {
 		return responses.InternalServerError(c, "Failed to sync sale report", err)
 	}
 
-	_ = reports.AutoCleanupSales(db)
+	// _ = reports.AutoCleanupSales(db)
 	_ = reports.SyncDailyProfitReport(db, sale)
 
 	return responses.JSONResponse(c, http.StatusOK, "Sale updated successfully", sale)

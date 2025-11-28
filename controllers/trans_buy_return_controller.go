@@ -456,10 +456,18 @@ func CmbPurchase(c *framework.Ctx) error {
 		month = nowWIB.Format("2006-01")
 	}
 
-	var purchases []models.Purchases
+	// Gunakan struct ringan hanya dengan kolom yang dibutuhkan
+	var purchases []struct {
+		ID            string    `json:"id"`
+		PurchaseDate  time.Time `json:"purchase_date"`
+		SupplierName  string    `json:"supplier_name"`
+		TotalPurchase int       `json:"total_purchase"`
+	}
 
 	query := config.DB.Table("purchases").
-		Where("branch_id = ?", branchID)
+		Select("purchases.id, purchases.purchase_date, suppliers.name AS supplier_name, purchases.total_purchase").
+		Joins("LEFT JOIN suppliers ON suppliers.id = purchases.supplier_id").
+		Where("purchases.branch_id = ?", branchID)
 
 	// Filter by month (purchase_date)
 	if month != "" {
@@ -472,22 +480,17 @@ func CmbPurchase(c *framework.Ctx) error {
 		query = query.Where("purchase_date BETWEEN ? AND ?", startDate, endDate)
 	}
 
-	// Optional search by purchases.id
+	// Optional search by purchases.id (tetap case-insensitive)
 	if search != "" {
-		search = strings.ToLower(search)
-		query = query.Where("LOWER(id) LIKE ?", "%"+search+"%")
+		searchLower := strings.ToLower(search)
+		query = query.Where("LOWER(purchases.id) LIKE ?", "%"+searchLower+"%")
 	}
 
-	query = query.Order("purchase_date DESC")
+	query = query.Order("purchases.purchase_date DESC")
 
-	if err := query.Find(&purchases).Error; err != nil {
+	if err := query.Scan(&purchases).Error; err != nil {
 		return responses.JSONResponse(c, http.StatusInternalServerError, "Gagal mengambil data pembelian", err.Error())
 	}
 
-	return responses.JSONResponse(
-		c,
-		http.StatusOK,
-		"Data pembelian berhasil diambil",
-		purchases,
-	)
+	return responses.JSONResponse(c, http.StatusOK, "Data pembelian berhasil diambil", purchases)
 }

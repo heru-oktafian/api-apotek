@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/heru-oktafian/api-apotek/models"
+	"github.com/heru-oktafian/api-apotek/reports"
+	"github.com/heru-oktafian/api-apotek/tools"
 	"github.com/heru-oktafian/scafold/config"
 	"github.com/heru-oktafian/scafold/framework"
 	"github.com/heru-oktafian/scafold/helpers"
@@ -29,6 +31,9 @@ func CreateDuplicateReceipe(c *framework.Ctx) error {
 		return responses.BadRequest(c, "Invalid request body", err)
 	}
 
+	// Get default_member id dari token
+	defaultMember, _ := middlewares.GetClaimsToken(c.Request, "default_member")
+
 	//--- VALIDASI INPUT ---
 
 	subscriptionType, _ := middlewares.GetClaimsToken(c.Request, "subscription_type")
@@ -42,6 +47,11 @@ func CreateDuplicateReceipe(c *framework.Ctx) error {
 		return responses.BadRequest(c, "Validate failed", err)
 	}
 	// --- AKHIR VALIDASI INPUT ---
+	// Modifikasi agar jika `member_id` tidak dikirim dalam request,
+	// maka `member_id` diisi `defaultMember` dari deklarasi tersebut.
+	if req.DuplicationReceipe.MemberId == "" {
+		req.DuplicationReceipe.MemberId = defaultMember
+	}
 
 	if req.DuplicationReceipe.Payment == "" {
 		req.DuplicationReceipe.Payment = "paid_by_cash"
@@ -62,12 +72,11 @@ func CreateDuplicateReceipe(c *framework.Ctx) error {
 	// 1. Simpan data Sales (induk)
 	durID := helpers.GenerateID("DUR")
 	req.DuplicationReceipe.ID = durID
-	req.DuplicationReceipe.Description = req.DuplicationReceipe.Description
 	req.DuplicationReceipe.DuplicateReceipeDate = nowWIB
-	req.DuplicationReceipe.Payment = req.DuplicationReceipe.Payment
 	req.DuplicationReceipe.UserID = userID
 	req.DuplicationReceipe.BranchID = branchID
 	req.DuplicationReceipe.CreatedAt = nowWIB
+	req.DuplicationReceipe.UpdatedAt = nowWIB
 
 	// Inisilisasi total & profit duplicate receipe
 	totalDUR := 0
@@ -203,15 +212,49 @@ func CreateDuplicateReceipe(c *framework.Ctx) error {
 			err = tx.Save(&branch).Error
 			if err != nil {
 				tx.Rollback()
-				// return c.Status(framework.StatusInternalServerError).JSON(framework.Map{
-				// 	"message": fmt.Sprintf("Failed to update quota for branch %s", branch.BranchName),
-				// 	"error":   err.Error(),
-				// })
 				return responses.InternalServerError(c, fmt.Sprintf("Failed to update quota for branch %s", branch.BranchName), err)
 			}
 		} else {
 			tx.Rollback()
 			return responses.BadRequest(c, fmt.Sprintf("No quota available for branch %s", branch.BranchName), nil)
+		}
+	}
+
+	if req.DuplicationReceipe.MemberId != "" && req.DuplicationReceipe.MemberId != defaultMember {
+		var member models.Member
+		err = tx.Where("id = ?", req.DuplicationReceipe.MemberId).First(&member).Error
+		if err != nil {
+			tx.Rollback()
+			if err == gorm.ErrRecordNotFound {
+				return responses.NotFound(c, fmt.Sprintf("Member with ID %s not found", req.DuplicationReceipe.MemberId))
+			}
+			return responses.InternalServerError(c, "Failed to retrieve member details for points calculation", err)
+		}
+
+		var memberCategory models.MemberCategory
+		err = tx.Where("id = ?", member.MemberCategoryId).First(&memberCategory).Error
+		if err != nil {
+			tx.Rollback()
+			if err == gorm.ErrRecordNotFound {
+				return responses.NotFound(c, fmt.Sprintf("Member category with ID %d not found for member %s", member.MemberCategoryId, member.ID))
+			}
+			return responses.InternalServerError(c, "Failed to retrieve member category for points calculation", err)
+		}
+
+		if memberCategory.PointsConversionRate > 0 {
+			// Pastikan total_sale adalah float untuk perhitungan poin
+			pointsEarned := float64(req.DuplicationReceipe.TotalDuplicateReceipe) / float64(memberCategory.PointsConversionRate)
+			member.Points += int(pointsEarned) // Tambahkan poin yang didapat (gunakan int jika kolom points int)
+
+			err = tx.Save(&member).Error
+			if err != nil {
+				tx.Rollback()
+				return responses.InternalServerError(c, fmt.Sprintf("Failed to update points for member %s", member.ID), err)
+			}
+		} else {
+			// Optional: Handle case where PointsConversionRate is 0 or less
+			// You might want to log this or return a specific error
+			fmt.Printf("Warning: PointsConversionRate for member category %d is zero or negative. Points not calculated.\n", member.MemberCategoryId)
 		}
 	}
 
@@ -222,7 +265,113 @@ func CreateDuplicateReceipe(c *framework.Ctx) error {
 	}
 
 	// Berhasil
-	return responses.JSONResponse(c, http.StatusOK, "Sale transaction created successfully", req)
+	return responses.JSONResponse(c, http.StatusOK, "Duplicate receipe transaction created successfully", req)
+}
+
+// UpdateDuplicateReceipe Function (Modified)
+func UpdateDuplicateReceipe(c *framework.Ctx) error {
+
+	// Hitung waktu sekarang dalam WIB
+	nowWIB := time.Now().In(utils.Location)
+
+	db := config.DB
+	id := c.Param("id")
+
+	var duplicate_receipe models.DuplicateReceipes
+	if err := db.First(&duplicate_receipe, "id = ?", id).Error; err != nil {
+		return responses.NotFound(c, "Receipe not found")
+	}
+
+	var input models.SaleInput
+	if err := c.BodyParser(&input); err != nil {
+		return responses.BadRequest(c, "Invalid input", err)
+	}
+
+	if input.MemberId != nil {
+		var member models.Member
+		if err := db.Where("id = ?", *input.MemberId).First(&member).Error; err != nil {
+			// Jika ID tidak valid, fallback ke default
+			memberId, _ := middlewares.GetClaimsToken(c.Request, "default_member")
+			duplicate_receipe.MemberId = memberId
+		} else {
+			duplicate_receipe.MemberId = *input.MemberId
+		}
+	}
+	// Jika nil → tidak diubah, tetap pakai MemberID yang sudah ada
+
+	if input.Payment != "" {
+		duplicate_receipe.Payment = models.PaymentStatus(input.Payment)
+	}
+
+	duplicate_receipe.UpdatedAt = nowWIB
+
+	var items []models.DuplicateRecipeItems
+	if err := db.Where("duplicate_recipe_id = ?", id).Find(&items).Error; err != nil {
+		return responses.InternalServerError(c, "Failed to fetch sale items", err)
+	}
+
+	total := 0
+	for _, item := range items {
+		total += item.SubTotal
+	}
+
+	// Gunakan diskon baru jika dikirim, jika tidak tetap pakai yang lama
+	if input.Discount != nil {
+		sale.Discount = *input.Discount
+	}
+	sale.TotalSale = total - sale.Discount
+
+	if err := db.Save(&sale).Error; err != nil {
+		return responses.InternalServerError(c, "Failed to update Duplicate receipe", err)
+	}
+
+	if err := reports.SyncSaleReport(db, sale); err != nil {
+		return responses.InternalServerError(c, "Failed to sync Duplicate receipe report", err)
+	}
+
+	// _ = reports.AutoCleanupSales(db)
+	_ = reports.SyncDailyProfitReport(db, sale)
+
+	return responses.JSONResponse(c, http.StatusOK, "Duplicate receipe updated successfully", sale)
+}
+
+// DeleteDuplicateReceipe Function
+func DeleteDuplicateReceipe(c *framework.Ctx) error {
+	db := config.DB
+	id := c.Param("id")
+
+	// Ambil sale
+	var sale models.Sales
+	if err := db.First(&sale, "id = ?", id).Error; err != nil {
+		return responses.NotFound(c, "Sale not found")
+	}
+
+	// Ambil & hapus item, serta rollback stok
+	var items []models.SaleItems
+	if err := db.Where("sale_id = ?", id).Find(&items).Error; err == nil {
+		for _, item := range items {
+			_ = tools.SubtractProductStock(db, item.ProductId, item.Qty)
+		}
+		db.Where("sale_id = ?", id).Delete(&models.SaleItems{})
+	}
+
+	// Hapus laporan transaksi
+	if err := db.Where("id = ? AND transaction_type = ?", sale.ID, models.Sale).Delete(&models.TransactionReports{}).Error; err != nil {
+		return responses.InternalServerError(c, "Failed to delete transaction report", err)
+	}
+
+	// Hapus data penjualan
+	if err := db.Delete(&sale).Error; err != nil {
+		return responses.InternalServerError(c, "Failed to delete sale", err)
+	}
+
+	// Delete laporan profit harian
+	_ = reports.DeleteDailyProfitReport(db, id)
+
+	// (Opsional) Sync laporan penjualan agar tetap konsisten
+	_ = reports.SyncSaleReport(db, sale)
+
+	return responses.JSONResponse(c, http.StatusOK, "Sale deleted successfully", sale)
 }
 
 type DuplicateReceipeRequest struct {

@@ -137,7 +137,7 @@ func CreateDuplicateReceipt(c *framework.Ctx) error {
 		return responses.InternalServerError(c, "Failed to create duplicate items", err)
 	}
 
-	transactionReportID := helpers.GenerateID("TRX")
+	transactionReportID := durID // Gunakan ID yang sama dengan DuplicateReceipt ID
 	transactionReport := models.TransactionReports{
 		ID:              transactionReportID,
 		TransactionType: models.Sale, // Tipe transaksi adalah "sale"
@@ -154,7 +154,10 @@ func CreateDuplicateReceipt(c *framework.Ctx) error {
 		return responses.InternalServerError(c, "Failed to create transaction report", err)
 	}
 
+	// 4. Sinkronisasi laporan duplicate receipt
+	// Inisialisasi laporan duplicate receipt
 	var dailyProfit models.DailyProfitReport
+
 	// Pastikan Duplicate date tidak nol saat diakses (validasi required sudah ada, tapi jaga-jaga)
 	if req.DuplicateReceipt.DuplicateReceiptDate.IsZero() {
 		tx.Rollback()
@@ -164,6 +167,7 @@ func CreateDuplicateReceipt(c *framework.Ctx) error {
 	reportDate := req.DuplicateReceipt.DuplicateReceiptDate.Format("2006-01-02") // Format tanggal menjadi "YYYY-MM-DD"
 	err = tx.Where("report_date = ? AND branch_id = ? AND user_id = ?", reportDate, req.DuplicateReceipt.BranchID, req.DuplicateReceipt.UserID).First(&dailyProfit).Error
 
+	// Cek error selain record not found
 	if err != nil && err != gorm.ErrRecordNotFound {
 		tx.Rollback()
 		return responses.InternalServerError(c, "Failed to check daily profit report", err)
@@ -171,7 +175,7 @@ func CreateDuplicateReceipt(c *framework.Ctx) error {
 
 	if err == gorm.ErrRecordNotFound {
 		// Jika belum ada, buat entri baru
-		dailyProfitID := helpers.GenerateID("DPR")
+		dailyProfitID := durID // Gunakan DuplicateReceipt ID sebagai DailyProfitReport ID
 		dailyProfit = models.DailyProfitReport{
 			ID:             dailyProfitID,
 			ReportDate:     req.DuplicateReceipt.DuplicateReceiptDate,

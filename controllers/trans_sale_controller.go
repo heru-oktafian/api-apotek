@@ -147,7 +147,7 @@ func CreateSaleTransaction(c *framework.Ctx) error {
 	}
 
 	// 3. Simpan data di TransactionReports
-	transactionReportID := helpers.GenerateID("TRX")
+	transactionReportID := saleID // Gunakan Sale ID sebagai TransactionReport ID
 	transactionReport := models.TransactionReports{
 		ID:              transactionReportID,
 		TransactionType: models.Sale, // Tipe transaksi adalah "sale"

@@ -4,7 +4,7 @@ import "time"
 
 // DuplicateReceipts represents a record for duplicate receipts in the system.
 type DuplicateReceipts struct {
-	ID                    string        `json:"id" gorm:"primaryKey;type:varchar(15)" validate:"required"`
+	ID                    string        `json:"id" gorm:"primaryKey;type:varchar(15)"`
 	MemberId              string        `gorm:"type:varchar(15);not null" json:"member_id"`
 	Description           string        `json:"description" gorm:"type:text"`
 	DuplicateReceiptDate  time.Time     `json:"duplicate_receipt_date" gorm:"not null"`

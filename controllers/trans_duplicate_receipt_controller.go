@@ -28,7 +28,7 @@ func CreateDuplicateReceipt(c *framework.Ctx) error {
 	db := config.DB
 	var req DuplicateReceiptRequest
 
-	// Deklarasi variabel ''err' untuk menangani error
+	// Deklarasi variabel 'err' untuk menangani error
 	err := c.BodyParser(&req)
 	if err != nil {
 		return responses.BadRequest(c, "Invalid request body", err)

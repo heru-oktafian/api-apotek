@@ -625,7 +625,7 @@ func GetAllDuplicateReceipts(c *framework.Ctx) error {
 	return responses.JSONResponseGetAll(
 		c,
 		http.StatusOK,
-		"Sales retrieved successfully",
+		"Duplicate receipts retrieved successfully",
 		search,
 		int(total),
 		page,
@@ -739,7 +739,7 @@ func GetAllDuplicateDetail(c *framework.Ctx) error {
 	return responses.JSONResponseGetAll(
 		c,
 		http.StatusOK,
-		"Sales retrieved successfully",
+		"Duplicate receipts retrieved successfully",
 		search,
 		int(total),
 		page,

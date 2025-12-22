@@ -140,3 +140,39 @@ func AutoCleanupSales(db *gorm.DB) error {
 
 	return nil
 }
+
+// Insert atau update laporan transaksi berdasarkan DuplicateReceipe
+func SyncDuplicateReceipeReport(db *gorm.DB, duplicate_receipe models.DuplicateReceipes) error {
+
+	// Hitung waktu sekarang dalam WIB
+	nowWIB := time.Now().In(utils.Location)
+
+	// Siapkan data report dari DuplicateReceipe
+	report := models.TransactionReports{
+		ID:              duplicate_receipe.ID,
+		TransactionType: models.Sale,
+		UserID:          duplicate_receipe.UserID,
+		BranchID:        duplicate_receipe.BranchID,
+		Total:           duplicate_receipe.TotalDuplicateReceipe,
+		CreatedAt:       duplicate_receipe.CreatedAt,
+		UpdatedAt:       duplicate_receipe.UpdatedAt,
+		Payment:         duplicate_receipe.Payment,
+	}
+
+	var existing models.TransactionReports
+	err := db.Take(&existing, "id = ?", report.ID).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		// Insert
+		return db.Create(&report).Error
+	}
+	if err != nil {
+		return err
+	}
+
+	// Jika ditemukan, lakukan update pada kolom yang dibutuhkan
+	existing.Total = report.Total
+	existing.UpdatedAt = nowWIB
+	existing.Payment = report.Payment
+
+	return db.Save(&existing).Error
+}

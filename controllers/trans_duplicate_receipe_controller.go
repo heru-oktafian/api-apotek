@@ -2,7 +2,10 @@ package controllers
 
 import (
 	"fmt"
+	"math"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/heru-oktafian/api-apotek/models"
@@ -85,7 +88,7 @@ func CreateDuplicateReceipe(c *framework.Ctx) error {
 	for i := range req.Items {
 		itemID := helpers.GenerateID("DRI")
 		req.Items[i].ID = itemID
-		req.Items[i].DuplicateRecipeId = durID
+		req.Items[i].DuplicateReceipeId = durID
 
 		// Dapatkan detail produk dari database
 		var product models.Product
@@ -282,7 +285,7 @@ func UpdateDuplicateReceipe(c *framework.Ctx) error {
 		return responses.NotFound(c, "Receipe not found")
 	}
 
-	var input models.SaleInput
+	var input models.DuplicateReceipeInput
 	if err := c.BodyParser(&input); err != nil {
 		return responses.BadRequest(c, "Invalid input", err)
 	}
@@ -305,7 +308,7 @@ func UpdateDuplicateReceipe(c *framework.Ctx) error {
 
 	duplicate_receipe.UpdatedAt = nowWIB
 
-	var items []models.DuplicateRecipeItems
+	var items []models.DuplicateReceipeItems
 	if err := db.Where("duplicate_recipe_id = ?", id).Find(&items).Error; err != nil {
 		return responses.InternalServerError(c, "Failed to fetch sale items", err)
 	}
@@ -315,24 +318,18 @@ func UpdateDuplicateReceipe(c *framework.Ctx) error {
 		total += item.SubTotal
 	}
 
-	// Gunakan diskon baru jika dikirim, jika tidak tetap pakai yang lama
-	if input.Discount != nil {
-		sale.Discount = *input.Discount
-	}
-	sale.TotalSale = total - sale.Discount
-
-	if err := db.Save(&sale).Error; err != nil {
+	if err := db.Save(&duplicate_receipe).Error; err != nil {
 		return responses.InternalServerError(c, "Failed to update Duplicate receipe", err)
 	}
 
-	if err := reports.SyncSaleReport(db, sale); err != nil {
+	if err := reports.SyncDuplicateReceipeReport(db, duplicate_receipe); err != nil {
 		return responses.InternalServerError(c, "Failed to sync Duplicate receipe report", err)
 	}
 
 	// _ = reports.AutoCleanupSales(db)
-	_ = reports.SyncDailyProfitReport(db, sale)
+	_ = reports.SyncDuplicateReceipeReport(db, duplicate_receipe)
 
-	return responses.JSONResponse(c, http.StatusOK, "Duplicate receipe updated successfully", sale)
+	return responses.JSONResponse(c, http.StatusOK, "Duplicate receipe updated successfully", duplicate_receipe)
 }
 
 // DeleteDuplicateReceipe Function
@@ -340,28 +337,28 @@ func DeleteDuplicateReceipe(c *framework.Ctx) error {
 	db := config.DB
 	id := c.Param("id")
 
-	// Ambil sale
-	var sale models.Sales
-	if err := db.First(&sale, "id = ?", id).Error; err != nil {
-		return responses.NotFound(c, "Sale not found")
+	// Ambil duplicate receipe
+	var duplicate_receipe models.DuplicateReceipes
+	if err := db.First(&duplicate_receipe, "id = ?", id).Error; err != nil {
+		return responses.NotFound(c, "Duplicate receipe not found")
 	}
 
 	// Ambil & hapus item, serta rollback stok
-	var items []models.SaleItems
-	if err := db.Where("sale_id = ?", id).Find(&items).Error; err == nil {
+	var items []models.DuplicateReceipeItems
+	if err := db.Where("duplicate_receipe_id = ?", id).Find(&items).Error; err == nil {
 		for _, item := range items {
 			_ = tools.SubtractProductStock(db, item.ProductId, item.Qty)
 		}
-		db.Where("sale_id = ?", id).Delete(&models.SaleItems{})
+		db.Where("duplicate_receipe_id = ?", id).Delete(&models.DuplicateReceipeItems{})
 	}
 
 	// Hapus laporan transaksi
-	if err := db.Where("id = ? AND transaction_type = ?", sale.ID, models.Sale).Delete(&models.TransactionReports{}).Error; err != nil {
+	if err := db.Where("id = ? AND transaction_type = ?", duplicate_receipe.ID, models.Sale).Delete(&models.TransactionReports{}).Error; err != nil {
 		return responses.InternalServerError(c, "Failed to delete transaction report", err)
 	}
 
 	// Hapus data penjualan
-	if err := db.Delete(&sale).Error; err != nil {
+	if err := db.Delete(&duplicate_receipe).Error; err != nil {
 		return responses.InternalServerError(c, "Failed to delete sale", err)
 	}
 
@@ -369,12 +366,271 @@ func DeleteDuplicateReceipe(c *framework.Ctx) error {
 	_ = reports.DeleteDailyProfitReport(db, id)
 
 	// (Opsional) Sync laporan penjualan agar tetap konsisten
-	_ = reports.SyncSaleReport(db, sale)
+	_ = reports.SyncDuplicateReceipeReport(db, duplicate_receipe)
 
-	return responses.JSONResponse(c, http.StatusOK, "Sale deleted successfully", sale)
+	return responses.JSONResponse(c, http.StatusOK, "Duplicate receipe deleted successfully", duplicate_receipe)
 }
 
 type DuplicateReceipeRequest struct {
-	DuplicationReceipe models.DuplicateReceipes      `json:"duplication_receipe"`
-	Items              []models.DuplicateRecipeItems `json:"items"`
+	DuplicationReceipe models.DuplicateReceipes       `json:"duplication_receipe"`
+	Items              []models.DuplicateReceipeItems `json:"items"`
+}
+
+// CreateDuplicateRecipeItem Function
+func CreateDuplicateRecipeItem(c *framework.Ctx) error {
+	db := config.DB
+	var item models.DuplicateReceipeItems
+
+	if err := c.BodyParser(&item); err != nil {
+		return responses.BadRequest(c, "Invalid input", err)
+	}
+
+	// Ambil harga jual produk dari tabel products
+	var product models.Product
+	if err := db.Select("sales_price").Where("id = ?", item.ProductId).First(&product).Error; err != nil {
+		return responses.InternalServerError(c, "Failed to fetch product price", err)
+	}
+
+	// Gunakan sales_price dari produk, abaikan inputan frontend
+	item.Price = product.SalesPrice
+
+	// Cek apakah item dengan duplicate_receipe_id dan product_id sudah ada
+	var existing models.DuplicateReceipeItems
+	err := db.Where("duplicate_receipe_id = ? AND product_id = ?", item.DuplicateReceipeId, item.ProductId).First(&existing).Error
+	if err == nil {
+		// Sudah ada: update qty dan sub_total
+		existing.Qty += item.Qty
+		existing.Price = product.SalesPrice
+		existing.SubTotal = existing.Qty * existing.Price
+
+		if err := db.Save(&existing).Error; err != nil {
+			return responses.InternalServerError(c, "Failed to update sale item", err)
+		}
+
+		if err := tools.ReduceProductStock(db, item.ProductId, item.Qty); err != nil {
+			return responses.InternalServerError(c, "Failed to reduce product stock", err)
+		}
+
+		if err := reports.RecalculateTotalSale(db, item.DuplicateReceipeId); err != nil {
+			return responses.InternalServerError(c, "Failed to recalculate total sale", err)
+		}
+
+		// Sync laporan profit harian
+		var duplicateReceipe models.DuplicateReceipes
+		if err := db.First(&duplicateReceipe, "id = ?", item.DuplicateReceipeId).Error; err != nil {
+			return responses.InternalServerError(c, "Failed to fetch duplicate receipe", err)
+		}
+
+		_ = reports.SyncDailyDuplicateProfitReport(db, duplicateReceipe)
+
+		return responses.JSONResponse(c, http.StatusOK, "Item updated successfully", existing)
+
+	} else if err != gorm.ErrRecordNotFound {
+		return responses.InternalServerError(c, "Failed to find existing sale item", err)
+	}
+
+	// Data belum ada, buat item baru
+	if item.ID == "" {
+		item.ID = helpers.GenerateID("SIT")
+	}
+	item.SubTotal = item.Qty * item.Price
+
+	if err := db.Create(&item).Error; err != nil {
+		return responses.InternalServerError(c, "Failed to create sale item", err)
+	}
+
+	if err := tools.ReduceProductStock(db, item.ProductId, item.Qty); err != nil {
+		return responses.InternalServerError(c, "Failed to reduce product stock", err)
+	}
+
+	if err := reports.RecalculateTotalSale(db, item.DuplicateReceipeId); err != nil {
+		return responses.InternalServerError(c, "Failed to recalculate total sale", err)
+	}
+
+	// Sync laporan profit harian
+	var duplicateReceipe models.DuplicateReceipes
+	if err := db.First(&duplicateReceipe, "id = ?", item.DuplicateReceipeId).Error; err != nil {
+		return responses.InternalServerError(c, "Failed to fetch duplicate receipe", err)
+	}
+
+	_ = reports.SyncDailyDuplicateProfitReport(db, duplicateReceipe)
+	return responses.JSONResponse(c, http.StatusOK, "Item added successfully", item)
+}
+
+// UpdateDuplicateRecipeItem Function
+func UpdateDuplicateRecipeItem(c *framework.Ctx) error {
+	db := config.DB
+	id := c.Param("id")
+
+	var existingItem models.DuplicateReceipeItems
+	if err := db.First(&existingItem, "id = ?", id).Error; err != nil {
+		return responses.NotFound(c, "Item not found")
+	}
+
+	// Parsing data baru dari body (hanya untuk ambil ProductId dan Qty baru)
+	var updatedData struct {
+		ProductId string `json:"product_id"`
+		Qty       int    `json:"qty"`
+	}
+	if err := c.BodyParser(&updatedData); err != nil {
+		return responses.BadRequest(c, "Invalid input", err)
+	}
+
+	// Rollback stok lama
+	if err := tools.AddProductStock(db, existingItem.ProductId, existingItem.Qty); err != nil {
+		return responses.InternalServerError(c, "Failed to add product stock", err)
+	}
+
+	// Ambil harga jual dari produk baru
+	var product models.Product
+	if err := db.Select("sales_price").Where("id = ?", updatedData.ProductId).First(&product).Error; err != nil {
+		return responses.InternalServerError(c, "Failed to get product price", err)
+	}
+
+	// Kurangi stok baru
+	if err := tools.ReduceProductStock(db, updatedData.ProductId, updatedData.Qty); err != nil {
+		return responses.InternalServerError(c, "Failed to reduce product stock", err)
+	}
+
+	// Update item
+	existingItem.ProductId = updatedData.ProductId
+	existingItem.Qty = updatedData.Qty
+	existingItem.Price = product.SalesPrice
+	existingItem.SubTotal = product.SalesPrice * updatedData.Qty
+
+	if err := db.Save(&existingItem).Error; err != nil {
+		return responses.InternalServerError(c, "Failed to update sale item", err)
+	}
+
+	if err := reports.RecalculateTotalSale(db, existingItem.DuplicateReceipeId); err != nil {
+		return responses.InternalServerError(c, "Failed to recalculate total sale", err)
+	}
+
+	// Sync laporan profit harian
+	var duplicateReceipe models.DuplicateReceipes
+	if err := db.First(&duplicateReceipe, "id = ?", existingItem.DuplicateReceipeId).Error; err != nil {
+		return responses.InternalServerError(c, "Failed to fetch duplicate receipe", err)
+	}
+
+	_ = reports.SyncDailyDuplicateProfitReport(db, duplicateReceipe)
+
+	return responses.JSONResponse(c, http.StatusOK, "Item updated successfully", existingItem)
+}
+
+// Delete DuplicateReceipeItem
+func DeleteDuplicateReceipeItem(c *framework.Ctx) error {
+	db := config.DB
+	id := c.Param("id")
+
+	var item models.DuplicateReceipeItems
+	if err := db.First(&item, "id = ?", id).Error; err != nil {
+		return responses.NotFound(c, "Item not found")
+	}
+
+	// Rollback stok
+	if err := tools.AddProductStock(db, item.ProductId, item.Qty); err != nil {
+		return responses.InternalServerError(c, "Failed to add product stock", err)
+	}
+
+	// Hapus item
+	if err := db.Delete(&item).Error; err != nil {
+		return responses.InternalServerError(c, "Failed to delete sale item", err)
+	}
+
+	// Recalculate total
+	if err := reports.RecalculateTotalSale(db, item.DuplicateReceipeId); err != nil {
+		return responses.InternalServerError(c, "Failed to recalculate total sale", err)
+	}
+
+	return responses.JSONResponse(c, http.StatusOK, "Item deleted successfully", item)
+}
+
+// GetAllDuplicateReceipes tampilkan semua duplicate receipe items
+func GetAllDuplicateReceipes(c *framework.Ctx) error {
+	// Hitung waktu sekarang dalam WIB
+	nowWIB := time.Now().In(utils.Location)
+
+	branchID, _ := middlewares.GetBranchID(c.Request)
+
+	// Ambil parameter page dan search dari query URL
+	pageParam := c.Query("page")
+	search := strings.TrimSpace(c.Query("search"))
+
+	// Konversi page ke int, default ke 1 jika tidak valid
+	page := 1
+	if p, err := strconv.Atoi(pageParam); err == nil && p > 0 {
+		page = p
+	}
+
+	limit := 10                  // Tetapkan limit ke 10 data per halaman
+	offset := (page - 1) * limit // Hitung offset berdasarkan halaman dan limit
+
+	month := strings.TrimSpace(c.Query("month"))
+
+	// Jika month kosong, isi dengan bulan ini (format YYYY-MM)
+	if month == "" {
+		month = nowWIB.Format("2006-01")
+	}
+
+	var salesFromDB []models.AllDuplicateReceipes // Gunakan models.AllDuplicateReceipes untuk mengambil data dari DB
+	var total int64
+
+	query := config.DB.Table("duplicate_receipes dr").
+		Select("dr.id, dr.member_id, mbr.name AS member_name, dr.duplicate_receipe_date, dr.total_sale, dr.discount, dr.profit_estimate, dr.payment").
+		Joins("LEFT JOIN members mbr on mbr.id = dr.member_id").
+		Where("dr.branch_id = ? AND dr.total_sale > 0", branchID).
+		Order("dr.created_at DESC")
+
+	if search != "" {
+		search = strings.ToLower(search)
+		query = query.Where("LOWER(mbr.name) LIKE ?", "%"+search+"%")
+	}
+
+	if month != "" {
+		parsedMonth, err := time.Parse("2006-01", month)
+		if err != nil {
+			// return helpers.JSONResponse(c, framework.StatusBadRequest, "Invalid month format", "Month should be in format YYYY-MM")
+			return responses.BadRequest(c, "Invalid month format. Month should be in format YYYY-MM", err)
+		}
+		startDate := parsedMonth
+		endDate := startDate.AddDate(0, 1, 0).Add(-time.Nanosecond)
+		query = query.Where("sl.duplicate_receipe_date BETWEEN ? AND ?", startDate, endDate)
+	}
+
+	if err := query.Count(&total).Error; err != nil {
+		return responses.InternalServerError(c, "Get sale failed", err)
+	}
+
+	if err := query.Offset(offset).Limit(limit).Scan(&salesFromDB).Error; err != nil {
+		return responses.InternalServerError(c, "Get sales failed", err)
+	}
+
+	// Buat slice baru untuk menampung data yang sudah diformat
+	var formattedDuplicateData []models.DuplicateDetailResponse
+	for _, duplicate_receipe := range salesFromDB {
+		formattedDuplicateData = append(formattedDuplicateData, models.DuplicateDetailResponse{
+			ID:                    duplicate_receipe.ID,
+			MemberId:              duplicate_receipe.MemberId,
+			MemberName:            duplicate_receipe.MemberName,
+			DuplicateReceipeDate:  utils.FormatIndonesianDate(duplicate_receipe.DuplicateReceipeDate), // Format tanggal di sini
+			TotalDuplicateReceipe: duplicate_receipe.TotalDuplicateReceipe,
+			ProfitEstimate:        duplicate_receipe.ProfitEstimate,
+			Payment:               string(duplicate_receipe.Payment),
+		})
+	}
+
+	totalPages := int(math.Ceil(float64(total) / float64(limit)))
+
+	// Gunakan JSONResponseGetAll helper dengan data yang sudah diformat
+	return responses.JSONResponseGetAll(
+		c,
+		http.StatusOK,
+		"Sales retrieved successfully",
+		search,
+		int(total),
+		page,
+		totalPages,
+		limit,
+		formattedDuplicateData, // Kirim data yang sudah diformat (slice dari DuplicateDetailResponse)
+	)
 }

@@ -673,7 +673,7 @@ func GetAllDuplicateDetail(c *framework.Ctx) error {
 	var salesFromDB []duplicateSummary
 	var total int64
 
-	query := config.DB.Table("duplicate_receipt dr").
+	query := config.DB.Table("duplicate_receipts dr").
 		Select("dr.id, dr.total_duplicate_receipt, dr.payment, dr.duplicate_receipt_date").
 		Joins("LEFT JOIN members mbr on mbr.id = dr.member_id").
 		Where("dr.branch_id = ? AND dr.total_duplicate_receipt > 0", branchID).

@@ -40,6 +40,8 @@ func main() {
 		&models.BuyReturns{},
 		&models.DailyProfitReport{},
 		&models.DailyAsset{},
+		&models.DuplicateReceiptItems{},
+		&models.DuplicateReceipts{},
 		&models.Expenses{},
 		&models.FirstStockItems{},
 		&models.FirstStocks{},
@@ -129,6 +131,9 @@ func main() {
 	routes.TransSaleItemRoutes(app)
 	routes.TransBuyReturnRoutes(app)
 	routes.TransSaleReturnRoutes(app)
+	routes.TransDuplicateReceiptRoutes(app)
+	routes.TransDuplicateItemRoutes(app)
+	routes.TransDuplicateDetailRoutes(app)
 	routes.CmbProdSaleReturn(app)
 	routes.CmbSaleRoute(app)
 	routes.CmbProdBuyReturn(app)

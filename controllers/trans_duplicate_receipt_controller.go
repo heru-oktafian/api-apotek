@@ -20,13 +20,13 @@ import (
 	"gorm.io/gorm"
 )
 
-// CreateDuplicateReceipe handles the creation of a new duplicate receipe record.
-func CreateDuplicateReceipe(c *framework.Ctx) error {
+// CreateDuplicateReceipt handles the creation of a new duplicate receipt record.
+func CreateDuplicateReceipt(c *framework.Ctx) error {
 	// Hitung waktu saat ini di zona WIB
 	nowWIB := time.Now().In(utils.Location)
 
 	db := config.DB
-	var req DuplicateReceipeRequest
+	var req DuplicateReceiptRequest
 
 	// Deklarasi variabel ''err' untuk menangani error
 	err := c.BodyParser(&req)
@@ -52,12 +52,12 @@ func CreateDuplicateReceipe(c *framework.Ctx) error {
 	// --- AKHIR VALIDASI INPUT ---
 	// Modifikasi agar jika `member_id` tidak dikirim dalam request,
 	// maka `member_id` diisi `defaultMember` dari deklarasi tersebut.
-	if req.DuplicationReceipe.MemberId == "" {
-		req.DuplicationReceipe.MemberId = defaultMember
+	if req.DuplicateReceipt.MemberId == "" {
+		req.DuplicateReceipt.MemberId = defaultMember
 	}
 
-	if req.DuplicationReceipe.Payment == "" {
-		req.DuplicationReceipe.Payment = "paid_by_cash"
+	if req.DuplicateReceipt.Payment == "" {
+		req.DuplicateReceipt.Payment = "paid_by_cash"
 	}
 
 	// --- Proses Penyimpanan Data ---
@@ -74,21 +74,21 @@ func CreateDuplicateReceipe(c *framework.Ctx) error {
 
 	// 1. Simpan data Sales (induk)
 	durID := helpers.GenerateID("DUR")
-	req.DuplicationReceipe.ID = durID
-	req.DuplicationReceipe.DuplicateReceipeDate = nowWIB
-	req.DuplicationReceipe.UserID = userID
-	req.DuplicationReceipe.BranchID = branchID
-	req.DuplicationReceipe.CreatedAt = nowWIB
-	req.DuplicationReceipe.UpdatedAt = nowWIB
+	req.DuplicateReceipt.ID = durID
+	req.DuplicateReceipt.DuplicateReceiptDate = nowWIB
+	req.DuplicateReceipt.UserID = userID
+	req.DuplicateReceipt.BranchID = branchID
+	req.DuplicateReceipt.CreatedAt = nowWIB
+	req.DuplicateReceipt.UpdatedAt = nowWIB
 
-	// Inisilisasi total & profit duplicate receipe
+	// Inisilisasi total & profit duplicate receipt
 	totalDUR := 0
 	totalProfDUR := 0
 
 	for i := range req.Items {
 		itemID := helpers.GenerateID("DRI")
 		req.Items[i].ID = itemID
-		req.Items[i].DuplicateReceipeId = durID
+		req.Items[i].DuplicateReceiptId = durID
 
 		// Dapatkan detail produk dari database
 		var product models.Product
@@ -121,14 +121,14 @@ func CreateDuplicateReceipe(c *framework.Ctx) error {
 		totalProfDUR += (req.Items[i].Price - product.PurchasePrice) * req.Items[i].Qty
 	}
 
-	// Hitung total duplicate receipe dari item-item yang ada
-	req.DuplicationReceipe.TotalDuplicateReceipe = totalDUR
-	req.DuplicationReceipe.ProfitEstimate = totalProfDUR
+	// Hitung total duplicate receipt dari item-item yang ada
+	req.DuplicateReceipt.TotalDuplicateReceipt = totalDUR
+	req.DuplicateReceipt.ProfitEstimate = totalProfDUR
 
-	err = tx.Create(&req.DuplicationReceipe).Error
+	err = tx.Create(&req.DuplicateReceipt).Error
 	if err != nil {
 		tx.Rollback()
-		return responses.InternalServerError(c, "Failed to create duplicate receipe", err)
+		return responses.InternalServerError(c, "Failed to create duplicate receipt", err)
 	}
 
 	err = tx.CreateInBatches(&req.Items, len(req.Items)).Error
@@ -141,10 +141,10 @@ func CreateDuplicateReceipe(c *framework.Ctx) error {
 	transactionReport := models.TransactionReports{
 		ID:              transactionReportID,
 		TransactionType: models.Sale, // Tipe transaksi adalah "sale"
-		UserID:          req.DuplicationReceipe.UserID,
-		BranchID:        req.DuplicationReceipe.BranchID,
-		Total:           req.DuplicationReceipe.TotalDuplicateReceipe,
-		Payment:         req.DuplicationReceipe.Payment,
+		UserID:          req.DuplicateReceipt.UserID,
+		BranchID:        req.DuplicateReceipt.BranchID,
+		Total:           req.DuplicateReceipt.TotalDuplicateReceipt,
+		Payment:         req.DuplicateReceipt.Payment,
 		CreatedAt:       nowWIB,
 		UpdatedAt:       nowWIB,
 	}
@@ -156,13 +156,13 @@ func CreateDuplicateReceipe(c *framework.Ctx) error {
 
 	var dailyProfit models.DailyProfitReport
 	// Pastikan Duplicate date tidak nol saat diakses (validasi required sudah ada, tapi jaga-jaga)
-	if req.DuplicationReceipe.DuplicateReceipeDate.IsZero() {
+	if req.DuplicateReceipt.DuplicateReceiptDate.IsZero() {
 		tx.Rollback()
 		return responses.BadRequest(c, "Date cannot be zero for daily profit report calculation. Please provide a valid date.", nil)
 	}
 
-	reportDate := req.DuplicationReceipe.DuplicateReceipeDate.Format("2006-01-02") // Format tanggal menjadi "YYYY-MM-DD"
-	err = tx.Where("report_date = ? AND branch_id = ? AND user_id = ?", reportDate, req.DuplicationReceipe.BranchID, req.DuplicationReceipe.UserID).First(&dailyProfit).Error
+	reportDate := req.DuplicateReceipt.DuplicateReceiptDate.Format("2006-01-02") // Format tanggal menjadi "YYYY-MM-DD"
+	err = tx.Where("report_date = ? AND branch_id = ? AND user_id = ?", reportDate, req.DuplicateReceipt.BranchID, req.DuplicateReceipt.UserID).First(&dailyProfit).Error
 
 	if err != nil && err != gorm.ErrRecordNotFound {
 		tx.Rollback()
@@ -174,11 +174,11 @@ func CreateDuplicateReceipe(c *framework.Ctx) error {
 		dailyProfitID := helpers.GenerateID("DPR")
 		dailyProfit = models.DailyProfitReport{
 			ID:             dailyProfitID,
-			ReportDate:     req.DuplicationReceipe.DuplicateReceipeDate,
-			UserID:         req.DuplicationReceipe.UserID,
-			BranchID:       req.DuplicationReceipe.BranchID,
-			TotalSales:     req.DuplicationReceipe.TotalDuplicateReceipe,
-			ProfitEstimate: req.DuplicationReceipe.ProfitEstimate,
+			ReportDate:     req.DuplicateReceipt.DuplicateReceiptDate,
+			UserID:         req.DuplicateReceipt.UserID,
+			BranchID:       req.DuplicateReceipt.BranchID,
+			TotalSales:     req.DuplicateReceipt.TotalDuplicateReceipt,
+			ProfitEstimate: req.DuplicateReceipt.ProfitEstimate,
 			CreatedAt:      nowWIB,
 			UpdatedAt:      nowWIB,
 		}
@@ -189,8 +189,8 @@ func CreateDuplicateReceipe(c *framework.Ctx) error {
 		}
 	} else {
 		// Jika sudah ada, update total_sales dan profit_estimate
-		dailyProfit.TotalSales += req.DuplicationReceipe.TotalDuplicateReceipe
-		dailyProfit.ProfitEstimate += req.DuplicationReceipe.ProfitEstimate
+		dailyProfit.TotalSales += req.DuplicateReceipt.TotalDuplicateReceipt
+		dailyProfit.ProfitEstimate += req.DuplicateReceipt.ProfitEstimate
 		dailyProfit.UpdatedAt = time.Now()
 		err = tx.Save(&dailyProfit).Error
 		if err != nil {
@@ -201,11 +201,11 @@ func CreateDuplicateReceipe(c *framework.Ctx) error {
 
 	if subscriptionType == "quota" {
 		var branch models.Branch
-		err = tx.Where("id = ?", req.DuplicationReceipe.BranchID).First(&branch).Error
+		err = tx.Where("id = ?", req.DuplicateReceipt.BranchID).First(&branch).Error
 		if err != nil {
 			tx.Rollback()
 			if err == gorm.ErrRecordNotFound {
-				return responses.NotFound(c, fmt.Sprintf("Branch with ID %s not found", req.DuplicationReceipe.BranchID))
+				return responses.NotFound(c, fmt.Sprintf("Branch with ID %s not found", req.DuplicateReceipt.BranchID))
 			}
 			return responses.InternalServerError(c, "Failed to retrieve branch details for quota update", err)
 		}
@@ -223,13 +223,13 @@ func CreateDuplicateReceipe(c *framework.Ctx) error {
 		}
 	}
 
-	if req.DuplicationReceipe.MemberId != "" && req.DuplicationReceipe.MemberId != defaultMember {
+	if req.DuplicateReceipt.MemberId != "" && req.DuplicateReceipt.MemberId != defaultMember {
 		var member models.Member
-		err = tx.Where("id = ?", req.DuplicationReceipe.MemberId).First(&member).Error
+		err = tx.Where("id = ?", req.DuplicateReceipt.MemberId).First(&member).Error
 		if err != nil {
 			tx.Rollback()
 			if err == gorm.ErrRecordNotFound {
-				return responses.NotFound(c, fmt.Sprintf("Member with ID %s not found", req.DuplicationReceipe.MemberId))
+				return responses.NotFound(c, fmt.Sprintf("Member with ID %s not found", req.DuplicateReceipt.MemberId))
 			}
 			return responses.InternalServerError(c, "Failed to retrieve member details for points calculation", err)
 		}
@@ -246,7 +246,7 @@ func CreateDuplicateReceipe(c *framework.Ctx) error {
 
 		if memberCategory.PointsConversionRate > 0 {
 			// Pastikan total_sale adalah float untuk perhitungan poin
-			pointsEarned := float64(req.DuplicationReceipe.TotalDuplicateReceipe) / float64(memberCategory.PointsConversionRate)
+			pointsEarned := float64(req.DuplicateReceipt.TotalDuplicateReceipt) / float64(memberCategory.PointsConversionRate)
 			member.Points += int(pointsEarned) // Tambahkan poin yang didapat (gunakan int jika kolom points int)
 
 			err = tx.Save(&member).Error
@@ -268,11 +268,11 @@ func CreateDuplicateReceipe(c *framework.Ctx) error {
 	}
 
 	// Berhasil
-	return responses.JSONResponse(c, http.StatusOK, "Duplicate receipe transaction created successfully", req)
+	return responses.JSONResponse(c, http.StatusOK, "Duplicate receipt transaction created successfully", req)
 }
 
-// UpdateDuplicateReceipe Function (Modified)
-func UpdateDuplicateReceipe(c *framework.Ctx) error {
+// UpdateDuplicateReceipt Function (Modified)
+func UpdateDuplicateReceipt(c *framework.Ctx) error {
 
 	// Hitung waktu sekarang dalam WIB
 	nowWIB := time.Now().In(utils.Location)
@@ -280,12 +280,12 @@ func UpdateDuplicateReceipe(c *framework.Ctx) error {
 	db := config.DB
 	id := c.Param("id")
 
-	var duplicate_receipe models.DuplicateReceipes
-	if err := db.First(&duplicate_receipe, "id = ?", id).Error; err != nil {
-		return responses.NotFound(c, "Receipe not found")
+	var duplicate_receipt models.DuplicateReceipts
+	if err := db.First(&duplicate_receipt, "id = ?", id).Error; err != nil {
+		return responses.NotFound(c, "Receipt not found")
 	}
 
-	var input models.DuplicateReceipeInput
+	var input models.DuplicateReceiptInput
 	if err := c.BodyParser(&input); err != nil {
 		return responses.BadRequest(c, "Invalid input", err)
 	}
@@ -295,21 +295,21 @@ func UpdateDuplicateReceipe(c *framework.Ctx) error {
 		if err := db.Where("id = ?", *input.MemberId).First(&member).Error; err != nil {
 			// Jika ID tidak valid, fallback ke default
 			memberId, _ := middlewares.GetClaimsToken(c.Request, "default_member")
-			duplicate_receipe.MemberId = memberId
+			duplicate_receipt.MemberId = memberId
 		} else {
-			duplicate_receipe.MemberId = *input.MemberId
+			duplicate_receipt.MemberId = *input.MemberId
 		}
 	}
 	// Jika nil → tidak diubah, tetap pakai MemberID yang sudah ada
 
 	if input.Payment != "" {
-		duplicate_receipe.Payment = models.PaymentStatus(input.Payment)
+		duplicate_receipt.Payment = models.PaymentStatus(input.Payment)
 	}
 
-	duplicate_receipe.UpdatedAt = nowWIB
+	duplicate_receipt.UpdatedAt = nowWIB
 
-	var items []models.DuplicateReceipeItems
-	if err := db.Where("duplicate_recipe_id = ?", id).Find(&items).Error; err != nil {
+	var items []models.DuplicateReceiptItems
+	if err := db.Where("duplicate_receipt_id = ?", id).Find(&items).Error; err != nil {
 		return responses.InternalServerError(c, "Failed to fetch sale items", err)
 	}
 
@@ -318,47 +318,47 @@ func UpdateDuplicateReceipe(c *framework.Ctx) error {
 		total += item.SubTotal
 	}
 
-	if err := db.Save(&duplicate_receipe).Error; err != nil {
-		return responses.InternalServerError(c, "Failed to update Duplicate receipe", err)
+	if err := db.Save(&duplicate_receipt).Error; err != nil {
+		return responses.InternalServerError(c, "Failed to update Duplicate receipt", err)
 	}
 
-	if err := reports.SyncDuplicateReceipeReport(db, duplicate_receipe); err != nil {
-		return responses.InternalServerError(c, "Failed to sync Duplicate receipe report", err)
+	if err := reports.SyncDuplicateReceiptReport(db, duplicate_receipt); err != nil {
+		return responses.InternalServerError(c, "Failed to sync Duplicate receipt report", err)
 	}
 
 	// _ = reports.AutoCleanupSales(db)
-	_ = reports.SyncDuplicateReceipeReport(db, duplicate_receipe)
+	_ = reports.SyncDuplicateReceiptReport(db, duplicate_receipt)
 
-	return responses.JSONResponse(c, http.StatusOK, "Duplicate receipe updated successfully", duplicate_receipe)
+	return responses.JSONResponse(c, http.StatusOK, "Duplicate receipt updated successfully", duplicate_receipt)
 }
 
-// DeleteDuplicateReceipe Function
-func DeleteDuplicateReceipe(c *framework.Ctx) error {
+// DeleteDuplicateReceipt Function
+func DeleteDuplicateReceipt(c *framework.Ctx) error {
 	db := config.DB
 	id := c.Param("id")
 
-	// Ambil duplicate receipe
-	var duplicate_receipe models.DuplicateReceipes
-	if err := db.First(&duplicate_receipe, "id = ?", id).Error; err != nil {
-		return responses.NotFound(c, "Duplicate receipe not found")
+	// Ambil duplicate receipt
+	var duplicate_receipt models.DuplicateReceipts
+	if err := db.First(&duplicate_receipt, "id = ?", id).Error; err != nil {
+		return responses.NotFound(c, "Duplicate receipt not found")
 	}
 
 	// Ambil & hapus item, serta rollback stok
-	var items []models.DuplicateReceipeItems
-	if err := db.Where("duplicate_receipe_id = ?", id).Find(&items).Error; err == nil {
+	var items []models.DuplicateReceiptItems
+	if err := db.Where("duplicate_receipt_id = ?", id).Find(&items).Error; err == nil {
 		for _, item := range items {
 			_ = tools.SubtractProductStock(db, item.ProductId, item.Qty)
 		}
-		db.Where("duplicate_receipe_id = ?", id).Delete(&models.DuplicateReceipeItems{})
+		db.Where("duplicate_receipt_id = ?", id).Delete(&models.DuplicateReceiptItems{})
 	}
 
 	// Hapus laporan transaksi
-	if err := db.Where("id = ? AND transaction_type = ?", duplicate_receipe.ID, models.Sale).Delete(&models.TransactionReports{}).Error; err != nil {
+	if err := db.Where("id = ? AND transaction_type = ?", duplicate_receipt.ID, models.Sale).Delete(&models.TransactionReports{}).Error; err != nil {
 		return responses.InternalServerError(c, "Failed to delete transaction report", err)
 	}
 
 	// Hapus data penjualan
-	if err := db.Delete(&duplicate_receipe).Error; err != nil {
+	if err := db.Delete(&duplicate_receipt).Error; err != nil {
 		return responses.InternalServerError(c, "Failed to delete sale", err)
 	}
 
@@ -366,20 +366,20 @@ func DeleteDuplicateReceipe(c *framework.Ctx) error {
 	_ = reports.DeleteDailyProfitReport(db, id)
 
 	// (Opsional) Sync laporan penjualan agar tetap konsisten
-	_ = reports.SyncDuplicateReceipeReport(db, duplicate_receipe)
+	_ = reports.SyncDuplicateReceiptReport(db, duplicate_receipt)
 
-	return responses.JSONResponse(c, http.StatusOK, "Duplicate receipe deleted successfully", duplicate_receipe)
+	return responses.JSONResponse(c, http.StatusOK, "Duplicate receipt deleted successfully", duplicate_receipt)
 }
 
-type DuplicateReceipeRequest struct {
-	DuplicationReceipe models.DuplicateReceipes       `json:"duplication_receipe"`
-	Items              []models.DuplicateReceipeItems `json:"items"`
+type DuplicateReceiptRequest struct {
+	DuplicateReceipt models.DuplicateReceipts       `json:"duplicate_receipt"`
+	Items            []models.DuplicateReceiptItems `json:"items"`
 }
 
 // CreateDuplicateRecipeItem Function
 func CreateDuplicateRecipeItem(c *framework.Ctx) error {
 	db := config.DB
-	var item models.DuplicateReceipeItems
+	var item models.DuplicateReceiptItems
 
 	if err := c.BodyParser(&item); err != nil {
 		return responses.BadRequest(c, "Invalid input", err)
@@ -394,9 +394,9 @@ func CreateDuplicateRecipeItem(c *framework.Ctx) error {
 	// Gunakan sales_price dari produk, abaikan inputan frontend
 	item.Price = product.SalesPrice
 
-	// Cek apakah item dengan duplicate_receipe_id dan product_id sudah ada
-	var existing models.DuplicateReceipeItems
-	err := db.Where("duplicate_receipe_id = ? AND product_id = ?", item.DuplicateReceipeId, item.ProductId).First(&existing).Error
+	// Cek apakah item dengan duplicate_receipt_id dan product_id sudah ada
+	var existing models.DuplicateReceiptItems
+	err := db.Where("duplicate_receipt_id = ? AND product_id = ?", item.DuplicateReceiptId, item.ProductId).First(&existing).Error
 	if err == nil {
 		// Sudah ada: update qty dan sub_total
 		existing.Qty += item.Qty
@@ -411,17 +411,17 @@ func CreateDuplicateRecipeItem(c *framework.Ctx) error {
 			return responses.InternalServerError(c, "Failed to reduce product stock", err)
 		}
 
-		if err := reports.RecalculateTotalSale(db, item.DuplicateReceipeId); err != nil {
+		if err := reports.RecalculateTotalSale(db, item.DuplicateReceiptId); err != nil {
 			return responses.InternalServerError(c, "Failed to recalculate total sale", err)
 		}
 
 		// Sync laporan profit harian
-		var duplicateReceipe models.DuplicateReceipes
-		if err := db.First(&duplicateReceipe, "id = ?", item.DuplicateReceipeId).Error; err != nil {
-			return responses.InternalServerError(c, "Failed to fetch duplicate receipe", err)
+		var duplicateReceipt models.DuplicateReceipts
+		if err := db.First(&duplicateReceipt, "id = ?", item.DuplicateReceiptId).Error; err != nil {
+			return responses.InternalServerError(c, "Failed to fetch duplicate receipt", err)
 		}
 
-		_ = reports.SyncDailyDuplicateProfitReport(db, duplicateReceipe)
+		_ = reports.SyncDailyDuplicateProfitReport(db, duplicateReceipt)
 
 		return responses.JSONResponse(c, http.StatusOK, "Item updated successfully", existing)
 
@@ -431,7 +431,7 @@ func CreateDuplicateRecipeItem(c *framework.Ctx) error {
 
 	// Data belum ada, buat item baru
 	if item.ID == "" {
-		item.ID = helpers.GenerateID("SIT")
+		item.ID = helpers.GenerateID("DRI")
 	}
 	item.SubTotal = item.Qty * item.Price
 
@@ -443,17 +443,17 @@ func CreateDuplicateRecipeItem(c *framework.Ctx) error {
 		return responses.InternalServerError(c, "Failed to reduce product stock", err)
 	}
 
-	if err := reports.RecalculateTotalSale(db, item.DuplicateReceipeId); err != nil {
+	if err := reports.RecalculateTotalSale(db, item.DuplicateReceiptId); err != nil {
 		return responses.InternalServerError(c, "Failed to recalculate total sale", err)
 	}
 
 	// Sync laporan profit harian
-	var duplicateReceipe models.DuplicateReceipes
-	if err := db.First(&duplicateReceipe, "id = ?", item.DuplicateReceipeId).Error; err != nil {
-		return responses.InternalServerError(c, "Failed to fetch duplicate receipe", err)
+	var duplicateReceipt models.DuplicateReceipts
+	if err := db.First(&duplicateReceipt, "id = ?", item.DuplicateReceiptId).Error; err != nil {
+		return responses.InternalServerError(c, "Failed to fetch duplicate receipt", err)
 	}
 
-	_ = reports.SyncDailyDuplicateProfitReport(db, duplicateReceipe)
+	_ = reports.SyncDailyDuplicateProfitReport(db, duplicateReceipt)
 	return responses.JSONResponse(c, http.StatusOK, "Item added successfully", item)
 }
 
@@ -462,7 +462,7 @@ func UpdateDuplicateRecipeItem(c *framework.Ctx) error {
 	db := config.DB
 	id := c.Param("id")
 
-	var existingItem models.DuplicateReceipeItems
+	var existingItem models.DuplicateReceiptItems
 	if err := db.First(&existingItem, "id = ?", id).Error; err != nil {
 		return responses.NotFound(c, "Item not found")
 	}
@@ -502,27 +502,27 @@ func UpdateDuplicateRecipeItem(c *framework.Ctx) error {
 		return responses.InternalServerError(c, "Failed to update sale item", err)
 	}
 
-	if err := reports.RecalculateTotalSale(db, existingItem.DuplicateReceipeId); err != nil {
+	if err := reports.RecalculateTotalSale(db, existingItem.DuplicateReceiptId); err != nil {
 		return responses.InternalServerError(c, "Failed to recalculate total sale", err)
 	}
 
 	// Sync laporan profit harian
-	var duplicateReceipe models.DuplicateReceipes
-	if err := db.First(&duplicateReceipe, "id = ?", existingItem.DuplicateReceipeId).Error; err != nil {
-		return responses.InternalServerError(c, "Failed to fetch duplicate receipe", err)
+	var duplicateReceipt models.DuplicateReceipts
+	if err := db.First(&duplicateReceipt, "id = ?", existingItem.DuplicateReceiptId).Error; err != nil {
+		return responses.InternalServerError(c, "Failed to fetch duplicate receipt", err)
 	}
 
-	_ = reports.SyncDailyDuplicateProfitReport(db, duplicateReceipe)
+	_ = reports.SyncDailyDuplicateProfitReport(db, duplicateReceipt)
 
 	return responses.JSONResponse(c, http.StatusOK, "Item updated successfully", existingItem)
 }
 
-// Delete DuplicateReceipeItem
-func DeleteDuplicateReceipeItem(c *framework.Ctx) error {
+// Delete DuplicateReceiptItem
+func DeleteDuplicateReceiptItem(c *framework.Ctx) error {
 	db := config.DB
 	id := c.Param("id")
 
-	var item models.DuplicateReceipeItems
+	var item models.DuplicateReceiptItems
 	if err := db.First(&item, "id = ?", id).Error; err != nil {
 		return responses.NotFound(c, "Item not found")
 	}
@@ -538,15 +538,15 @@ func DeleteDuplicateReceipeItem(c *framework.Ctx) error {
 	}
 
 	// Recalculate total
-	if err := reports.RecalculateTotalSale(db, item.DuplicateReceipeId); err != nil {
+	if err := reports.RecalculateTotalSale(db, item.DuplicateReceiptId); err != nil {
 		return responses.InternalServerError(c, "Failed to recalculate total sale", err)
 	}
 
 	return responses.JSONResponse(c, http.StatusOK, "Item deleted successfully", item)
 }
 
-// GetAllDuplicateReceipes tampilkan semua duplicate receipe items
-func GetAllDuplicateReceipes(c *framework.Ctx) error {
+// GetAllDuplicateReceipts tampilkan semua duplicate receipt items
+func GetAllDuplicateReceipts(c *framework.Ctx) error {
 	// Hitung waktu sekarang dalam WIB
 	nowWIB := time.Now().In(utils.Location)
 
@@ -572,13 +572,13 @@ func GetAllDuplicateReceipes(c *framework.Ctx) error {
 		month = nowWIB.Format("2006-01")
 	}
 
-	var salesFromDB []models.AllDuplicateReceipes // Gunakan models.AllDuplicateReceipes untuk mengambil data dari DB
+	var salesFromDB []models.AllDuplicateReceipts // Gunakan models.AllDuplicateReceipts untuk mengambil data dari DB
 	var total int64
 
-	query := config.DB.Table("duplicate_receipes dr").
-		Select("dr.id, dr.member_id, mbr.name AS member_name, dr.duplicate_receipe_date, dr.total_sale, dr.discount, dr.profit_estimate, dr.payment").
+	query := config.DB.Table("duplicate_receipts dr").
+		Select("dr.id, dr.member_id, mbr.name AS member_name, dr.duplicate_receipt_date, dr.total_duplicate_receipt, dr.discount, dr.profit_estimate, dr.payment").
 		Joins("LEFT JOIN members mbr on mbr.id = dr.member_id").
-		Where("dr.branch_id = ? AND dr.total_sale > 0", branchID).
+		Where("dr.branch_id = ? AND dr.total_duplicate_receipt > 0", branchID).
 		Order("dr.created_at DESC")
 
 	if search != "" {
@@ -594,7 +594,7 @@ func GetAllDuplicateReceipes(c *framework.Ctx) error {
 		}
 		startDate := parsedMonth
 		endDate := startDate.AddDate(0, 1, 0).Add(-time.Nanosecond)
-		query = query.Where("sl.duplicate_receipe_date BETWEEN ? AND ?", startDate, endDate)
+		query = query.Where("dr.duplicate_receipt_date BETWEEN ? AND ?", startDate, endDate)
 	}
 
 	if err := query.Count(&total).Error; err != nil {
@@ -607,15 +607,15 @@ func GetAllDuplicateReceipes(c *framework.Ctx) error {
 
 	// Buat slice baru untuk menampung data yang sudah diformat
 	var formattedDuplicateData []models.DuplicateDetailResponse
-	for _, duplicate_receipe := range salesFromDB {
+	for _, duplicate_receipt := range salesFromDB {
 		formattedDuplicateData = append(formattedDuplicateData, models.DuplicateDetailResponse{
-			ID:                    duplicate_receipe.ID,
-			MemberId:              duplicate_receipe.MemberId,
-			MemberName:            duplicate_receipe.MemberName,
-			DuplicateReceipeDate:  utils.FormatIndonesianDate(duplicate_receipe.DuplicateReceipeDate), // Format tanggal di sini
-			TotalDuplicateReceipe: duplicate_receipe.TotalDuplicateReceipe,
-			ProfitEstimate:        duplicate_receipe.ProfitEstimate,
-			Payment:               string(duplicate_receipe.Payment),
+			ID:                    duplicate_receipt.ID,
+			MemberId:              duplicate_receipt.MemberId,
+			MemberName:            duplicate_receipt.MemberName,
+			DuplicateReceiptDate:  utils.FormatIndonesianDate(duplicate_receipt.DuplicateReceiptDate), // Format tanggal di sini
+			TotalDuplicateReceipt: duplicate_receipt.TotalDuplicateReceipt,
+			ProfitEstimate:        duplicate_receipt.ProfitEstimate,
+			Payment:               string(duplicate_receipt.Payment),
 		})
 	}
 
@@ -633,4 +633,195 @@ func GetAllDuplicateReceipes(c *framework.Ctx) error {
 		limit,
 		formattedDuplicateData, // Kirim data yang sudah diformat (slice dari DuplicateDetailResponse)
 	)
+}
+
+// GetAllDuplicateDetail menampilkan sales dengan kolom description yang
+// berisi daftar nama item (dipisah koma) diikuti dengan duplicate_receipt_date (DD-MM-YYYY HH:MM)
+// di mana waktu ditambah 7 jam sesuai permintaan.
+func GetAllDuplicateDetail(c *framework.Ctx) error {
+	// Hitung waktu sekarang dalam WIB
+	nowWIB := time.Now().In(utils.Location)
+
+	branchID, _ := middlewares.GetBranchID(c.Request)
+
+	// Ambil parameter page dan search dari query URL
+	pageParam := c.Query("page")
+	search := strings.TrimSpace(c.Query("search"))
+
+	// Konversi page ke int, default ke 1 jika tidak valid
+	page := 1
+	if p, err := strconv.Atoi(pageParam); err == nil && p > 0 {
+		page = p
+	}
+
+	limit := 10
+	offset := (page - 1) * limit
+
+	month := strings.TrimSpace(c.Query("month"))
+	if month == "" {
+		month = nowWIB.Format("2006-01")
+	}
+
+	// Struct sementara untuk menampung hasil query
+	type duplicateSummary struct {
+		ID                    string
+		TotalDuplicateReceipt int
+		Payment               string
+		SaleDate              time.Time
+	}
+
+	var salesFromDB []duplicateSummary
+	var total int64
+
+	query := config.DB.Table("duplicate_receipt dr").
+		Select("dr.id, dr.total_duplicate_receipt, dr.payment, dr.duplicate_receipt_date").
+		Joins("LEFT JOIN members mbr on mbr.id = dr.member_id").
+		Where("dr.branch_id = ? AND dr.total_duplicate_receipt > 0", branchID).
+		Order("dr.created_at DESC")
+
+	if search != "" {
+		s := strings.ToLower(search)
+		query = query.Where("LOWER(mbr.name) LIKE ?", "%"+s+"%")
+	}
+
+	if month != "" {
+		parsedMonth, err := time.Parse("2006-01", month)
+		if err != nil {
+			return responses.BadRequest(c, "Invalid month format. Month should be in format YYYY-MM", err)
+		}
+		startDate := parsedMonth
+		endDate := startDate.AddDate(0, 1, 0).Add(-time.Nanosecond)
+		query = query.Where("dr.duplicate_receipt_date BETWEEN ? AND ?", startDate, endDate)
+	}
+
+	if err := query.Count(&total).Error; err != nil {
+		return responses.InternalServerError(c, "Get duplicate receipt failed", err)
+	}
+
+	if err := query.Offset(offset).Limit(limit).Scan(&salesFromDB).Error; err != nil {
+		return responses.InternalServerError(c, "Get duplicate receipt failed", err)
+	}
+
+	// Bentuk response dengan description
+	var formatted []map[string]interface{}
+	for _, s := range salesFromDB {
+		// Ambil nama item untuk sale ini
+		var itemNames []string
+		if err := config.DB.Table("duplicate_receipt_items dri").
+			Select("pro.name").
+			Joins("LEFT JOIN products pro ON pro.id = dri.product_id").
+			Where("dri.duplicate_receipt_id = ?", s.ID).
+			Order("pro.name ASC").
+			Pluck("pro.name", &itemNames).Error; err != nil {
+			return responses.InternalServerError(c, "Failed to get duplicate receipt items", err)
+		}
+
+		// Gabungkan nama item, lalu tambahkan tanggal yang ditambah 7 jam
+		descItems := strings.Join(itemNames, ", ")
+		dateWith7 := s.SaleDate.Add(7 * time.Hour).Format("02-01-2006 15:04")
+		var description string
+		if descItems != "" {
+			description = descItems + " ; " + dateWith7
+		} else {
+			description = dateWith7
+		}
+
+		formatted = append(formatted, map[string]interface{}{
+			"id":                      s.ID,
+			"total_duplicate_receipt": s.TotalDuplicateReceipt,
+			"payment":                 s.Payment,
+			"description":             description,
+		})
+	}
+
+	totalPages := int(math.Ceil(float64(total) / float64(limit)))
+
+	return responses.JSONResponseGetAll(
+		c,
+		http.StatusOK,
+		"Sales retrieved successfully",
+		search,
+		int(total),
+		page,
+		totalPages,
+		limit,
+		formatted,
+	)
+}
+
+// GetAllDuplicateItems tampilkan semua item berdasarkan duplicate_receipt_id tanpa pagination
+func GetAllDuplicateItems(c *framework.Ctx) error {
+	// Get duplicate receipt id dari param
+	duplicateReceiptID := c.Param("id")
+
+	// Parsing body JSON ke struct
+	var DuplicateItems []models.AllDuplicateReceiptItems
+
+	// Query dasar
+	query := config.DB.Table("duplicate_receipt_items dri").
+		Select("dri.id, dri.duplicate_receipt_id, dri.product_id, pro.name AS product_name, dri.price, dri.qty, un.name AS unit_name, dri.sub_total").
+		Joins("LEFT JOIN products pro ON pro.id = dri.product_id").
+		Joins("LEFT JOIN units un ON un.id = pro.unit_id").
+		Where("dri.duplicate_receipt_id = ?", duplicateReceiptID).
+		Order("pro.name ASC")
+
+	// Eksekusi query
+	if err := query.Scan(&DuplicateItems).Error; err != nil {
+		return responses.InternalServerError(c, "Get items failed", err)
+	}
+
+	return responses.JSONResponse(c, http.StatusOK, "Items retrieved successfully", DuplicateItems)
+}
+
+// GetDuplicateWithItems menampilkan satu duplicate receipt beserta semua item-nya
+func GetDuplicateWithItems(c *framework.Ctx) error {
+	db := config.DB
+
+	duplicateId := c.Param("id")
+
+	// Gunakan models.AllDuplicateReceipts untuk mengambil data dari DB
+	var duplicate_receipts models.AllDuplicateReceipts
+
+	err := db.Table("duplicate_receipts dr").
+		Select("dr.id, dr.member_id, mbr.name AS member_name, dr.duplicate_receipt_date, dr.total_duplicate_receipt, dr.profit_estimate, dr.payment").
+		Joins("LEFT JOIN members mbr ON mbr.id = dr.member_id").
+		Where("dr.id = ?", duplicateId).
+		Scan(&duplicate_receipts).Error
+	if err != nil {
+		return responses.InternalServerError(c, "Failed to get duplicate receipt", err)
+	}
+
+	// Ambil item pembelian terkait
+	var items []models.AllDuplicateReceiptItems
+	err = db.Table("duplicate_receipt_items dri").
+		Select("dri.id, dri.duplicate_receipt_id, dri.product_id, pro.name AS product_name, dri.price, dri.qty, un.name AS unit_name, dri.sub_total").
+		Joins("LEFT JOIN products pro ON pro.id = dri.product_id").
+		Joins("LEFT JOIN units un ON un.id = pro.unit_id").
+		Where("dri.duplicate_receipt_id = ?", duplicateId).
+		Order("pro.name ASC").
+		Scan(&items).Error
+
+	if err != nil {
+		return responses.InternalServerError(c, "Failed to get duplicate receipt items", err)
+	}
+
+	// Format tanggal secara manual untuk respons ini
+	// Menggunakan helper FormatIndonesianDate yang sudah kita buat
+	formattedDuplicateDate := utils.FormatIndonesianDate(duplicate_receipts.DuplicateReceiptDate)
+
+	// Buat objek respons menggunakan struct DuplicateItemResponse yang baru
+	// dan isi field-fieldnya
+	responseDetail := models.DuplicateItemResponse{
+		ID:                    duplicate_receipts.ID,
+		MemberId:              duplicate_receipts.MemberId,
+		MemberName:            duplicate_receipts.MemberName,
+		DuplicateReceiptDate:  formattedDuplicateDate, // Gunakan tanggal yang sudah diformat
+		TotalDuplicateReceipt: duplicate_receipts.TotalDuplicateReceipt,
+		ProfitEstimate:        duplicate_receipts.ProfitEstimate,
+		Payment:               string(duplicate_receipts.Payment),
+		Items:                 items,
+	}
+
+	// Panggil JSONResponse yang sudah ada, meneruskan DuplicateItemResponse sebagai 'data'
+	return responses.JSONResponse(c, http.StatusOK, "Duplicate receipt retrieved successfully", responseDetail)
 }

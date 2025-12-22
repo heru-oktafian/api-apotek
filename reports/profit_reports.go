@@ -37,7 +37,7 @@ func SyncDailyProfitReport(db *gorm.DB, sale models.Sales) error {
 }
 
 // Insert atau update laporan transaksi penjualan berdasarkan DailyProfit
-func SyncDailyDuplicateProfitReport(db *gorm.DB, duplicate_receipe models.DuplicateReceipes) error {
+func SyncDailyDuplicateProfitReport(db *gorm.DB, duplicate_receipe models.DuplicateReceipts) error {
 	var report models.DailyProfitReport
 
 	err := db.Where("id = ? AND branch_id = ? AND user_id = ?", duplicate_receipe.ID, duplicate_receipe.BranchID, duplicate_receipe.UserID).
@@ -48,10 +48,10 @@ func SyncDailyDuplicateProfitReport(db *gorm.DB, duplicate_receipe models.Duplic
 	}
 
 	report.ID = duplicate_receipe.ID
-	report.ReportDate = duplicate_receipe.DuplicateReceipeDate
+	report.ReportDate = duplicate_receipe.DuplicateReceiptDate
 	report.BranchID = duplicate_receipe.BranchID
 	report.UserID = duplicate_receipe.UserID
-	report.TotalSales = duplicate_receipe.TotalDuplicateReceipe
+	report.TotalSales = duplicate_receipe.TotalDuplicateReceipt
 	report.ProfitEstimate = duplicate_receipe.ProfitEstimate
 
 	if err == gorm.ErrRecordNotFound {

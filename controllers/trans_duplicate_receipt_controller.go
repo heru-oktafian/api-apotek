@@ -379,8 +379,8 @@ type DuplicateReceiptRequest struct {
 	Items            []models.DuplicateReceiptItems `json:"items"`
 }
 
-// CreateDuplicateRecipeItem Function
-func CreateDuplicateRecipeItem(c *framework.Ctx) error {
+// CreateDuplicateReceiptItem Function
+func CreateDuplicateReceiptItem(c *framework.Ctx) error {
 	db := config.DB
 	var item models.DuplicateReceiptItems
 
@@ -460,8 +460,8 @@ func CreateDuplicateRecipeItem(c *framework.Ctx) error {
 	return responses.JSONResponse(c, http.StatusOK, "Item added successfully", item)
 }
 
-// UpdateDuplicateRecipeItem Function
-func UpdateDuplicateRecipeItem(c *framework.Ctx) error {
+// UpdateDuplicateReceiptItem Function
+func UpdateDuplicateReceiptItem(c *framework.Ctx) error {
 	db := config.DB
 	id := c.Param("id")
 

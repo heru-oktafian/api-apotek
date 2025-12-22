@@ -40,16 +40,16 @@ func TransDuplicateItemRoutes(app *framework.Fiber) {
 	transDuplicateItemAPI := app.Group("/api/duplicate-receipts-items", middlewares.Protected(JWTSecret), middlewares.AuthorizeRole("operator", "cashier", "finance", "superadmin", "administrator"))
 
 	// POST /api/duplicate-receipts-items - Membuat item penjualan baru
-	transDuplicateItemAPI.Post("/", controllers.CreateSaleItem)
+	transDuplicateItemAPI.Post("/", controllers.CreateDuplicateReceiptItem)
 
 	// GET /api/duplicate-receipts-items/all/:id - Mengambil semua item penjualan berdasarkan ID transaksi
-	transDuplicateItemAPI.Get("/all/:id", controllers.GetAllSaleItems)
+	transDuplicateItemAPI.Get("/all/:id", controllers.GetAllDuplicateItems)
 
 	// PUT /api/duplicate-receipts-items/:id - Memperbarui item penjualan
-	transDuplicateItemAPI.Put("/:id", controllers.UpdateSaleItem)
+	transDuplicateItemAPI.Put("/:id", controllers.UpdateDuplicateReceiptItem)
 
 	// DELETE /api/duplicate-receipts-items/:id - Menghapus item penjualan (soft delete)
-	transDuplicateItemAPI.Delete("/:id", controllers.DeleteSaleItem)
+	transDuplicateItemAPI.Delete("/:id", controllers.DeleteDuplicateReceiptItem)
 }
 
 // TransDuplicateDetailRoutes mengatur rute untuk resource transaksi kopi resep dengan detail item di dalamnya

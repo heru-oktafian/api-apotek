@@ -2,11 +2,11 @@ package models
 
 // DuplicateReceipt Items model
 type DuplicateReceiptItems struct {
-	ID                 string `gorm:"type:varchar(15);primaryKey" json:"id" validate:"required"`
+	ID                 string `gorm:"type:varchar(15);primaryKey" json:"id"`
 	DuplicateReceiptId string `gorm:"type:varchar(15);not null" json:"duplicate_receipt_id"`
-	ProductId          string `gorm:"type:varchar(15);not null" json:"product_id" validate:"required"`
-	Price              int    `gorm:"type:int;not null;default:0" json:"price" validate:"required"`
-	Qty                int    `gorm:"type:int;not null;default:0" json:"qty" validate:"required"`
+	ProductId          string `gorm:"type:varchar(15);not null" json:"product_id"`
+	Price              int    `gorm:"type:int;not null;default:0" json:"price"`
+	Qty                int    `gorm:"type:int;not null;default:0" json:"qty"`
 	SubTotal           int    `gorm:"type:int;not null;default:0" json:"sub_total"`
 }
 

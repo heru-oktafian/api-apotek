@@ -175,7 +175,7 @@ func CreateDuplicateReceipt(c *framework.Ctx) error {
 
 	if err == gorm.ErrRecordNotFound {
 		// Jika belum ada, buat entri baru
-		dailyProfitID := durID // Gunakan DuplicateReceipt ID sebagai DailyProfitReport ID
+		dailyProfitID := helpers.GenerateID("DPR")
 		dailyProfit = models.DailyProfitReport{
 			ID:             dailyProfitID,
 			ReportDate:     req.DuplicateReceipt.DuplicateReceiptDate,

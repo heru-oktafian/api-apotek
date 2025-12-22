@@ -576,7 +576,7 @@ func GetAllDuplicateReceipts(c *framework.Ctx) error {
 	var total int64
 
 	query := config.DB.Table("duplicate_receipts dr").
-		Select("dr.id, dr.member_id, mbr.name AS member_name, dr.duplicate_receipt_date, dr.total_duplicate_receipt, dr.discount, dr.profit_estimate, dr.payment").
+		Select("dr.id, dr.member_id, mbr.name AS member_name, dr.duplicate_receipt_date, dr.total_duplicate_receipt, dr.profit_estimate, dr.payment").
 		Joins("LEFT JOIN members mbr on mbr.id = dr.member_id").
 		Where("dr.branch_id = ? AND dr.total_duplicate_receipt > 0", branchID).
 		Order("dr.created_at DESC")

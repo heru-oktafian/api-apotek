@@ -175,7 +175,7 @@ func CreateDuplicateReceipt(c *framework.Ctx) error {
 
 	if err == gorm.ErrRecordNotFound {
 		// Jika belum ada, buat entri baru
-		dailyProfitID := helpers.GenerateID("DPR")
+		dailyProfitID := durID // Gunakan DuplicateReceipt ID sebagai DailyProfitReport ID
 		dailyProfit = models.DailyProfitReport{
 			ID:             dailyProfitID,
 			ReportDate:     req.DuplicateReceipt.DuplicateReceiptDate,
@@ -330,7 +330,6 @@ func UpdateDuplicateReceipt(c *framework.Ctx) error {
 		return responses.InternalServerError(c, "Failed to sync Duplicate receipt report", err)
 	}
 
-	// _ = reports.AutoCleanupSales(db)
 	_ = reports.SyncDuplicateReceiptReport(db, duplicate_receipt)
 
 	return responses.JSONResponse(c, http.StatusOK, "Duplicate receipt updated successfully", duplicate_receipt)

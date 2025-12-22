@@ -8,11 +8,11 @@ type DuplicateReceipts struct {
 	MemberId              string        `gorm:"type:varchar(15);not null" json:"member_id"`
 	Description           string        `json:"description" gorm:"type:text"`
 	DuplicateReceiptDate  time.Time     `json:"duplicate_receipt_date" gorm:"not null"`
-	TotalDuplicateReceipt int           `json:"total_duplicate_receipt" gorm:"not null" validate:"required" type:"int"`
-	ProfitEstimate        int           `json:"profit_estimate" gorm:"not null" validate:"required" type:"int"`
+	TotalDuplicateReceipt int           `json:"total_duplicate_receipt" gorm:"not null" type:"int"`
+	ProfitEstimate        int           `json:"profit_estimate" gorm:"not null" type:"int"`
 	Payment               PaymentStatus `json:"payment" gorm:"type:payment_status; default: 'unpaid';not null" validate:"required"`
-	BranchID              string        `json:"branch_id" gorm:"type:varchar(15);not null" validate:"required"`
-	UserID                string        `json:"user_id" gorm:"type:varchar(15);not null" validate:"required"`
+	BranchID              string        `json:"branch_id" gorm:"type:varchar(15);not null"`
+	UserID                string        `json:"user_id" gorm:"type:varchar(15);not null"`
 	CreatedAt             time.Time     `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt             time.Time     `json:"updated_at" gorm:"autoUpdateTime"`
 }

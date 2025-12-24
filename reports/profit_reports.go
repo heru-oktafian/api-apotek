@@ -1,63 +1,68 @@
 package reports
 
 import (
+	"time"
+
 	"github.com/heru-oktafian/api-apotek/models"
 	"gorm.io/gorm"
 )
 
-// Hapus data DailyProfitReport
-func DeleteDailyProfitReport(db *gorm.DB, id string) error {
-	return db.Where("id = ?", id).Delete(&models.DailyProfitReport{}).Error
+// Hapus data DailyProfitReport berdasarkan tipe transaksi
+func DeleteDailyProfitReport(db *gorm.DB, id string, transType string) error {
+	// Deklarasi variabel untuk menampung data transaksi
+	var sale models.Sales
+	var duplicate_receipe models.DuplicateReceipts
+	var vsale_date time.Time
+	vtotal_sale := 0
+	vprofit_estimate := 0
+
+	// Ambil data transaksi berdasarkan tipe
+	switch transType {
+	case "sale":
+		if err := db.Where("id = ?", id).First(&sale).Error; err != nil {
+			return err
+		}
+		vtotal_sale = sale.TotalSale
+		vsale_date = sale.SaleDate
+		vprofit_estimate = sale.ProfitEstimate
+	case "duplicate_receipt":
+		if err := db.Where("id = ?", id).First(&duplicate_receipe).Error; err != nil {
+			return err
+		}
+		vtotal_sale = duplicate_receipe.TotalDuplicateReceipt
+		vprofit_estimate = duplicate_receipe.ProfitEstimate
+		vsale_date = duplicate_receipe.DuplicateReceiptDate
+	}
+
+	// Ambil data laporan profit harian berdasarkan tanggal transaksi
+	var report models.DailyProfitReport
+	if err := db.Where("report_date = ?", vsale_date).First(&report).Error; err != nil {
+		return err
+	}
+	report.TotalSales -= vtotal_sale
+	report.ProfitEstimate -= vprofit_estimate
+	return db.Save(&report).Error
 }
 
 // Insert atau update laporan transaksi penjualan berdasarkan DailyProfit
-func SyncDailyProfitReport(db *gorm.DB, sale models.Sales) error {
+func SyncDailyProfitReport(db *gorm.DB, branchID, userID string, reportDate time.Time, totalSales, profitEstimate int, totalBefore, profitBefore int) error {
 	var report models.DailyProfitReport
+	vsales := totalSales - totalBefore
+	vprofit := profitEstimate - profitBefore
 
-	err := db.Where("id = ? AND branch_id = ? AND user_id = ?", sale.ID, sale.BranchID, sale.UserID).
-		First(&report).Error
+	err := db.Where("branch_id = ? AND user_id = ? AND report_date = ?", branchID, userID, reportDate).First(&report).Error
 
 	if err != nil && err != gorm.ErrRecordNotFound {
 		return err
 	}
 
-	report.ID = sale.ID
-	report.ReportDate = sale.SaleDate
-	report.BranchID = sale.BranchID
-	report.UserID = sale.UserID
-	report.TotalSales = sale.TotalSale
-	report.ProfitEstimate = sale.ProfitEstimate
+	report.UserID = userID
+	report.ReportDate = reportDate
+	report.TotalSales = vsales
+	report.ProfitEstimate = vprofit
 
 	if err == gorm.ErrRecordNotFound {
 		return db.Create(&report).Error
-	} else {
-		return db.Save(&report).Error
 	}
-
-}
-
-// Insert atau update laporan transaksi penjualan berdasarkan DailyProfit
-func SyncDailyDuplicateProfitReport(db *gorm.DB, duplicate_receipe models.DuplicateReceipts) error {
-	var report models.DailyProfitReport
-
-	err := db.Where("id = ? AND branch_id = ? AND user_id = ?", duplicate_receipe.ID, duplicate_receipe.BranchID, duplicate_receipe.UserID).
-		First(&report).Error
-
-	if err != nil && err != gorm.ErrRecordNotFound {
-		return err
-	}
-
-	report.ID = duplicate_receipe.ID
-	report.ReportDate = duplicate_receipe.DuplicateReceiptDate
-	report.BranchID = duplicate_receipe.BranchID
-	report.UserID = duplicate_receipe.UserID
-	report.TotalSales = duplicate_receipe.TotalDuplicateReceipt
-	report.ProfitEstimate = duplicate_receipe.ProfitEstimate
-
-	if err == gorm.ErrRecordNotFound {
-		return db.Create(&report).Error
-	} else {
-		return db.Save(&report).Error
-	}
-
+	return db.Save(&report).Error
 }

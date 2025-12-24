@@ -106,6 +106,41 @@ func RecalculateTotalSale(db *gorm.DB, saleID string) error {
 	return nil
 }
 
+func RecalculateTotalDuplicate(db *gorm.DB, duplicateReceiptID string) error {
+	var total int
+
+	// Ambil seluruh item dari duplicate receipt
+	var duplicateItems []models.DuplicateReceiptItems
+	if err := db.Where("duplicate_receipt_id = ?", duplicateReceiptID).Find(&duplicateItems).Error; err != nil {
+		return err
+	}
+
+	// Ambil data duplicate receipt termasuk discount
+	var duplicateReceipt models.DuplicateReceipts
+	if err := db.First(&duplicateReceipt, "id = ?", duplicateReceiptID).Error; err != nil {
+		return err
+	}
+
+	// Hitung total
+	for _, item := range duplicateItems {
+		total += item.SubTotal
+	}
+
+	// Update ke tabel duplicate_receipts
+	if err := db.Model(&models.DuplicateReceipts{}).Where("id = ?", duplicateReceiptID).Updates(map[string]any{
+		"total_duplicate_receipt": total,
+	}).Error; err != nil {
+		return err
+	}
+
+	// Sync ke laporan transaksi
+	if err := SyncDuplicateReceiptReport(db, duplicateReceipt); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // AutoCleanupSales will delete any sales older than 2 hours without sale items
 func AutoCleanupSales(db *gorm.DB) error {
 	var sales []models.Sales

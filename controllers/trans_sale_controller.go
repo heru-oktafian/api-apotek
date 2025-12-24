@@ -299,15 +299,22 @@ func UpdateSale(c *framework.Ctx) error {
 	// Hitung waktu sekarang dalam WIB
 	nowWIB := time.Now().In(utils.Location)
 
+	branchID, _ := middlewares.GetBranchID(c.Request)
+	userID, _ := middlewares.GetUserID(c.Request)
+
+	total_before := 0
+	profit_before := 0
+
 	db := config.DB
 	id := c.Param("id")
-
-	// branchId, _ := middlewares.GetBranchID(c.Request)
 
 	var sale models.Sales
 	if err := db.First(&sale, "id = ?", id).Error; err != nil {
 		return responses.NotFound(c, "Sale not found")
 	}
+
+	total_before += sale.TotalSale
+	profit_before += sale.ProfitEstimate
 
 	var input models.SaleInput
 	if err := c.BodyParser(&input); err != nil {
@@ -342,6 +349,11 @@ func UpdateSale(c *framework.Ctx) error {
 		total += item.SubTotal
 	}
 
+	profit := 0
+	for _, item := range items {
+		profit += item.SubTotal - item.Price*item.Qty
+	}
+
 	// Gunakan diskon baru jika dikirim, jika tidak tetap pakai yang lama
 	if input.Discount != nil {
 		sale.Discount = *input.Discount
@@ -356,8 +368,8 @@ func UpdateSale(c *framework.Ctx) error {
 		return responses.InternalServerError(c, "Failed to sync sale report", err)
 	}
 
-	// _ = reports.AutoCleanupSales(db)
-	_ = reports.SyncDailyProfitReport(db, sale)
+	// Sync laporan penjualan agar tetap konsisten
+	_ = reports.SyncDailyProfitReport(db, branchID, userID, sale.SaleDate, total, profit, total_before, profit_before)
 
 	return responses.JSONResponse(c, http.StatusOK, "Sale updated successfully", sale)
 }
@@ -393,7 +405,7 @@ func DeleteSale(c *framework.Ctx) error {
 	}
 
 	// Delete laporan profit harian
-	_ = reports.DeleteDailyProfitReport(db, id)
+	_ = reports.DeleteDailyProfitReport(db, id, "sale")
 
 	// (Opsional) Sync laporan penjualan agar tetap konsisten
 	_ = reports.SyncSaleReport(db, sale)
@@ -403,6 +415,10 @@ func DeleteSale(c *framework.Ctx) error {
 
 // CreateSaleItem Function
 func CreateSaleItem(c *framework.Ctx) error {
+	// Get branch and user IDs from middleware
+	branchID, _ := middlewares.GetBranchID(c.Request)
+	userID, _ := middlewares.GetUserID(c.Request)
+
 	db := config.DB
 	var item models.SaleItems
 
@@ -446,8 +462,6 @@ func CreateSaleItem(c *framework.Ctx) error {
 			return responses.InternalServerError(c, "Failed to fetch sale", err)
 		}
 
-		_ = reports.SyncDailyProfitReport(db, sale)
-
 		return responses.JSONResponse(c, http.StatusOK, "Item updated successfully", existing)
 
 	} else if err != gorm.ErrRecordNotFound {
@@ -478,7 +492,7 @@ func CreateSaleItem(c *framework.Ctx) error {
 		return responses.InternalServerError(c, "Failed to fetch sale", err)
 	}
 
-	_ = reports.SyncDailyProfitReport(db, sale)
+	_ = reports.SyncDailyProfitReport(db, branchID, userID, sale.SaleDate, sale.TotalSale, sale.ProfitEstimate, 0, 0)
 
 	return responses.JSONResponse(c, http.StatusOK, "Item added successfully", item)
 }
@@ -487,6 +501,9 @@ func CreateSaleItem(c *framework.Ctx) error {
 func UpdateSaleItem(c *framework.Ctx) error {
 	db := config.DB
 	id := c.Param("id")
+
+	branchID, _ := middlewares.GetBranchID(c.Request)
+	userID, _ := middlewares.GetUserID(c.Request)
 
 	var existingItem models.SaleItems
 	if err := db.First(&existingItem, "id = ?", id).Error; err != nil {
@@ -538,7 +555,7 @@ func UpdateSaleItem(c *framework.Ctx) error {
 		return responses.InternalServerError(c, "Failed to fetch sale", err)
 	}
 
-	_ = reports.SyncDailyProfitReport(db, sale)
+	_ = reports.SyncDailyProfitReport(db, branchID, userID, sale.SaleDate, sale.TotalSale, sale.ProfitEstimate, 0, 0)
 
 	return responses.JSONResponse(c, http.StatusOK, "Item updated successfully", existingItem)
 }

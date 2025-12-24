@@ -165,7 +165,7 @@ func CreateDuplicateReceipt(c *framework.Ctx) error {
 	}
 
 	reportDate := req.DuplicateReceipt.DuplicateReceiptDate.Format("2006-01-02") // Format tanggal menjadi "YYYY-MM-DD"
-	err = tx.Where("report_date = ? AND branch_id = ? AND user_id = ?", reportDate, req.DuplicateReceipt.BranchID, req.DuplicateReceipt.UserID).First(&dailyProfit).Error
+	err = tx.Where("report_date = ? AND branch_id = ? AND user_id = ?", reportDate, branchID, userID).First(&dailyProfit).Error
 
 	// Cek error selain record not found
 	if err != nil && err != gorm.ErrRecordNotFound {
@@ -175,12 +175,12 @@ func CreateDuplicateReceipt(c *framework.Ctx) error {
 
 	if err == gorm.ErrRecordNotFound {
 		// Jika belum ada, buat entri baru
-		dailyProfitID := durID // Gunakan DuplicateReceipt ID sebagai DailyProfitReport ID
+		dailyProfitID := helpers.GenerateID("DPR")
 		dailyProfit = models.DailyProfitReport{
 			ID:             dailyProfitID,
 			ReportDate:     req.DuplicateReceipt.DuplicateReceiptDate,
-			UserID:         req.DuplicateReceipt.UserID,
-			BranchID:       req.DuplicateReceipt.BranchID,
+			UserID:         userID,
+			BranchID:       branchID,
 			TotalSales:     req.DuplicateReceipt.TotalDuplicateReceipt,
 			ProfitEstimate: req.DuplicateReceipt.ProfitEstimate,
 			CreatedAt:      nowWIB,
@@ -281,6 +281,12 @@ func UpdateDuplicateReceipt(c *framework.Ctx) error {
 	// Hitung waktu sekarang dalam WIB
 	nowWIB := time.Now().In(utils.Location)
 
+	branchID, _ := middlewares.GetBranchID(c.Request)
+	userID, _ := middlewares.GetUserID(c.Request)
+
+	total_before := 0
+	profit_before := 0
+
 	db := config.DB
 	id := c.Param("id")
 
@@ -288,6 +294,9 @@ func UpdateDuplicateReceipt(c *framework.Ctx) error {
 	if err := db.First(&duplicate_receipt, "id = ?", id).Error; err != nil {
 		return responses.NotFound(c, "Receipt not found")
 	}
+
+	total_before += duplicate_receipt.TotalDuplicateReceipt
+	profit_before += duplicate_receipt.ProfitEstimate
 
 	var input models.DuplicateReceiptInput
 	if err := c.BodyParser(&input); err != nil {
@@ -322,6 +331,11 @@ func UpdateDuplicateReceipt(c *framework.Ctx) error {
 		total += item.SubTotal
 	}
 
+	profit := 0
+	for _, item := range items {
+		profit += item.SubTotal - item.Price*item.Qty
+	}
+
 	if err := db.Save(&duplicate_receipt).Error; err != nil {
 		return responses.InternalServerError(c, "Failed to update Duplicate receipt", err)
 	}
@@ -330,7 +344,8 @@ func UpdateDuplicateReceipt(c *framework.Ctx) error {
 		return responses.InternalServerError(c, "Failed to sync Duplicate receipt report", err)
 	}
 
-	_ = reports.SyncDuplicateReceiptReport(db, duplicate_receipt)
+	// Sync laporan penjualan agar tetap konsisten
+	_ = reports.SyncDailyProfitReport(db, branchID, userID, duplicate_receipt.DuplicateReceiptDate, total, profit, total_before, profit_before)
 
 	return responses.JSONResponse(c, http.StatusOK, "Duplicate receipt updated successfully", duplicate_receipt)
 }
@@ -366,10 +381,7 @@ func DeleteDuplicateReceipt(c *framework.Ctx) error {
 	}
 
 	// Delete laporan profit harian
-	_ = reports.DeleteDailyProfitReport(db, id)
-
-	// (Opsional) Sync laporan penjualan agar tetap konsisten
-	_ = reports.SyncDuplicateReceiptReport(db, duplicate_receipt)
+	_ = reports.DeleteDailyProfitReport(db, id, "duplicate_receipt")
 
 	return responses.JSONResponse(c, http.StatusOK, "Duplicate receipt deleted successfully", duplicate_receipt)
 }
@@ -381,8 +393,13 @@ type DuplicateReceiptRequest struct {
 
 // CreateDuplicateReceiptItem Function
 func CreateDuplicateReceiptItem(c *framework.Ctx) error {
-	db := config.DB
+	// Get branch and user IDs from middleware
+	branchID, _ := middlewares.GetBranchID(c.Request)
+	userID, _ := middlewares.GetUserID(c.Request)
+
 	var item models.DuplicateReceiptItems
+
+	db := config.DB
 
 	if err := c.BodyParser(&item); err != nil {
 		return responses.BadRequest(c, "Invalid input", err)
@@ -424,8 +441,6 @@ func CreateDuplicateReceiptItem(c *framework.Ctx) error {
 			return responses.InternalServerError(c, "Failed to fetch duplicate receipt", err)
 		}
 
-		_ = reports.SyncDailyDuplicateProfitReport(db, duplicateReceipt)
-
 		return responses.JSONResponse(c, http.StatusOK, "Item updated successfully", existing)
 
 	} else if err != gorm.ErrRecordNotFound {
@@ -446,7 +461,7 @@ func CreateDuplicateReceiptItem(c *framework.Ctx) error {
 		return responses.InternalServerError(c, "Failed to reduce product stock", err)
 	}
 
-	if err := reports.RecalculateTotalSale(db, item.DuplicateReceiptId); err != nil {
+	if err := reports.RecalculateTotalDuplicate(db, item.DuplicateReceiptId); err != nil {
 		return responses.InternalServerError(c, "Failed to recalculate total sale", err)
 	}
 
@@ -456,7 +471,8 @@ func CreateDuplicateReceiptItem(c *framework.Ctx) error {
 		return responses.InternalServerError(c, "Failed to fetch duplicate receipt", err)
 	}
 
-	_ = reports.SyncDailyDuplicateProfitReport(db, duplicateReceipt)
+	_ = reports.SyncDailyProfitReport(db, branchID, userID, duplicateReceipt.DuplicateReceiptDate, duplicateReceipt.TotalDuplicateReceipt, duplicateReceipt.ProfitEstimate, 0, 0)
+
 	return responses.JSONResponse(c, http.StatusOK, "Item added successfully", item)
 }
 
@@ -464,6 +480,9 @@ func CreateDuplicateReceiptItem(c *framework.Ctx) error {
 func UpdateDuplicateReceiptItem(c *framework.Ctx) error {
 	db := config.DB
 	id := c.Param("id")
+
+	branchID, _ := middlewares.GetBranchID(c.Request)
+	userID, _ := middlewares.GetUserID(c.Request)
 
 	var existingItem models.DuplicateReceiptItems
 	if err := db.First(&existingItem, "id = ?", id).Error; err != nil {
@@ -505,7 +524,7 @@ func UpdateDuplicateReceiptItem(c *framework.Ctx) error {
 		return responses.InternalServerError(c, "Failed to update sale item", err)
 	}
 
-	if err := reports.RecalculateTotalSale(db, existingItem.DuplicateReceiptId); err != nil {
+	if err := reports.RecalculateTotalDuplicate(db, existingItem.DuplicateReceiptId); err != nil {
 		return responses.InternalServerError(c, "Failed to recalculate total sale", err)
 	}
 
@@ -515,7 +534,7 @@ func UpdateDuplicateReceiptItem(c *framework.Ctx) error {
 		return responses.InternalServerError(c, "Failed to fetch duplicate receipt", err)
 	}
 
-	_ = reports.SyncDailyDuplicateProfitReport(db, duplicateReceipt)
+	_ = reports.SyncDailyProfitReport(db, branchID, userID, duplicateReceipt.DuplicateReceiptDate, duplicateReceipt.TotalDuplicateReceipt, duplicateReceipt.ProfitEstimate, 0, 0)
 
 	return responses.JSONResponse(c, http.StatusOK, "Item updated successfully", existingItem)
 }
@@ -541,7 +560,7 @@ func DeleteDuplicateReceiptItem(c *framework.Ctx) error {
 	}
 
 	// Recalculate total
-	if err := reports.RecalculateTotalSale(db, item.DuplicateReceiptId); err != nil {
+	if err := reports.RecalculateTotalDuplicate(db, item.DuplicateReceiptId); err != nil {
 		return responses.InternalServerError(c, "Failed to recalculate total sale", err)
 	}
 

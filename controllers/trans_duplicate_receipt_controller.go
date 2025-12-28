@@ -192,7 +192,7 @@ func CreateDuplicateReceipt(c *framework.Ctx) error {
 			return responses.InternalServerError(c, "Failed to create daily profit report", err)
 		}
 	} else {
-		// Jika sudah ada, update total_sales dan profit_estimate
+		// Jika sudah ada, update total_sales dan profit_estimate yang sudah ada
 		dailyProfit.TotalSales += req.DuplicateReceipt.TotalDuplicateReceipt
 		dailyProfit.ProfitEstimate += req.DuplicateReceipt.ProfitEstimate
 		dailyProfit.UpdatedAt = time.Now()

@@ -98,3 +98,49 @@ func DeleteTemporaryProductCache(cacheKey string) error {
 	key := fmt.Sprintf("tmp:products:sale:%s", cacheKey)
 	return config.RDB.Del(ctx, key).Err()
 }
+
+// SetTemporaryPurchaseProductCache menyimpan daftar produk pembelian sementara ke Redis dengan cacheKey sebagai pembeda
+func SetTemporaryPurchaseProductCache(cacheKey string, products []models.ProdPurchaseCombo) error {
+	ctx := context.Background()
+	// Ping Redis to check connection
+	if _, err := config.RDB.Ping(ctx).Result(); err != nil {
+		fmt.Printf("Redis ping failed: %v\n", err)
+		return err
+	}
+	key := fmt.Sprintf("tmp:products:purchase:%s", cacheKey)
+	data, err := json.Marshal(products)
+	if err != nil {
+		return err
+	}
+	// Set dengan TTL 30 menit
+	err = config.RDB.Set(ctx, key, data, 30*time.Minute).Err()
+	if err == nil {
+		fmt.Printf("Successfully saved purchase product cache to Redis key: %s\n", key)
+	}
+	return err
+}
+
+// GetTemporaryPurchaseProductCache mengambil daftar produk pembelian sementara dari Redis berdasarkan cacheKey
+func GetTemporaryPurchaseProductCache(cacheKey string) ([]models.ProdPurchaseCombo, error) {
+	ctx := context.Background()
+	key := fmt.Sprintf("tmp:products:purchase:%s", cacheKey)
+	val, err := config.RDB.Get(ctx, key).Result()
+	if err == redis.Nil {
+		return nil, nil // Tidak ada data cache
+	}
+	if err != nil {
+		return nil, err
+	}
+	var products []models.ProdPurchaseCombo
+	if err := json.Unmarshal([]byte(val), &products); err != nil {
+		return nil, err
+	}
+	return products, nil
+}
+
+// DeleteTemporaryPurchaseProductCache menghapus cache produk pembelian sementara dari Redis berdasarkan cacheKey
+func DeleteTemporaryPurchaseProductCache(cacheKey string) error {
+	ctx := context.Background()
+	key := fmt.Sprintf("tmp:products:purchase:%s", cacheKey)
+	return config.RDB.Del(ctx, key).Err()
+}

@@ -160,32 +160,47 @@ func CmbProdSale(c *framework.Ctx) error {
 
 // CmbProdPurchase mengembalikan daftar produk untuk combo box transaksi pembelian
 func CmbProdPurchase(c *framework.Ctx) error {
-	// get branch id
 	branch_id, _ := middlewares.GetBranchID(c.Request)
+	user_id, _ := middlewares.GetUserID(c.Request)
+	search := strings.TrimSpace(c.Query("search"))
 
-	// Ambil search key dari query parameter
-	search := strings.TrimSpace(c.Query("search")) // Default to empty string if not provided
+	// Buat cacheKey berdasarkan branch_id dan user_id
+	cacheKey := fmt.Sprintf("%v:%v", branch_id, user_id)
 
-	// deklarasi variabel untuk combo box produk transaksi pembelian
+	// Cek apakah ada data di Redis terlebih dahulu
+	cachedProducts, err := tools.GetTemporaryPurchaseProductCache(cacheKey)
+	if err != nil {
+		fmt.Printf("Failed to get purchase product cache for cacheKey %s: %v\n", cacheKey, err)
+		// Lanjutkan ke query database jika gagal ambil cache
+	}
+	if cachedProducts != nil {
+		// Jika ada data di cache, gunakan data tersebut
+		return responses.JSONResponse(c, http.StatusOK, "Combo Purchase Products retrieved from cache successfully", cachedProducts)
+	}
+
+	// Jika tidak ada di cache, lakukan query ke database
 	var cmbProducts []models.ProdPurchaseCombo
 
-	// ambil data produk untuk combo box transaksi pembelian
 	query := config.DB.Table("products").
 		Select("products.id as product_id, products.name as product_name, purchase_price AS price, products.unit_id, units.name AS unit_name").
 		Joins("LEFT JOIN units ON units.id = products.unit_id").
 		Where("products.branch_id = ?", branch_id)
 
-	// Jika search tidak kosong, tambahkan kondisi LIKE
 	if search != "" {
 		search = strings.ToLower(search)
-		query = query.Where("LOWER(products.name) LIKE ? OR LOWER(products.description) LIKE ?", "%"+search+"%", "%"+search+"%")
+		query = query.Where("LOWER(products.name) LIKE ? OR LOWER(products.description) LIKE ? OR LOWER(products.id) LIKE ?", "%"+search+"%", "%"+search+"%", "%"+search+"%")
 	}
 
-	// Tambahkan sorting ascending berdasarkan products.name
 	query = query.Order("products.name ASC")
 
 	if err := query.Scan(&cmbProducts).Error; err != nil {
-		return responses.JSONResponse(c, http.StatusInternalServerError, "Get Combo Products failed", err)
+		return responses.JSONResponse(c, http.StatusInternalServerError, "Get Combo Purchase Products failed", err)
 	}
-	return responses.JSONResponse(c, http.StatusOK, "Combo Products retrieved successfully", cmbProducts)
+
+	// Simpan list produk ke Redis dengan cacheKey
+	if err := tools.SetTemporaryPurchaseProductCache(cacheKey, cmbProducts); err != nil {
+		fmt.Printf("Failed to save purchase product cache for cacheKey %s: %v\n", cacheKey, err)
+	}
+
+	return responses.JSONResponse(c, http.StatusOK, "Combo Purchase Products retrieved successfully", cmbProducts)
 }

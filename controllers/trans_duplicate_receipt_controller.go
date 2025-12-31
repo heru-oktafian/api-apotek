@@ -417,15 +417,19 @@ func DeleteDuplicateReceipt(c *framework.Ctx) error {
 	if err := db.Where("duplicate_receipt_id = ?", id).Find(&items).Error; err == nil {
 		for _, item := range items {
 			_ = tools.SubtractProductStock(db, item.ProductId, item.Qty)
-			// Update stock in Redis
+		}
+		// Update stock in Redis asynchronously
+		go func(items []models.DuplicateReceiptItems) {
 			cacheKey := fmt.Sprintf("%s:%s", duplicate_receipt.BranchID, duplicate_receipt.UserID)
-			var prod models.Product
-			if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
-				if err := UpdateProductStockInRedis(cacheKey, item.ProductId, prod.Stock); err != nil {
-					fmt.Printf("Failed to update stock in Redis for product %s: %v\n", item.ProductId, err)
+			for _, item := range items {
+				var prod models.Product
+				if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
+					if err := UpdateProductStockInRedis(cacheKey, item.ProductId, prod.Stock); err != nil {
+						fmt.Printf("Failed to update stock in Redis for product %s asynchronously: %v\n", item.ProductId, err)
+					}
 				}
 			}
-		}
+		}(items)
 		db.Where("duplicate_receipt_id = ?", id).Delete(&models.DuplicateReceiptItems{})
 	}
 
@@ -494,17 +498,17 @@ func CreateDuplicateReceiptItem(c *framework.Ctx) error {
 			return responses.InternalServerError(c, "Failed to reduce product stock", err)
 		}
 
-		// Update stock in Redis
-		cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
-		var prod models.Product
-		if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
-			if err := UpdateProductStockInRedis(cacheKey, item.ProductId, prod.Stock); err != nil {
-				fmt.Printf("Failed to update stock in Redis for product %s: %v\n", item.ProductId, err)
-			}
-		}
-
-		// Recalculate total asynchronously
+		// Supporting operations asynchronously
 		go func() {
+			// Update stock in Redis
+			cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
+			var prod models.Product
+			if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
+				if err := UpdateProductStockInRedis(cacheKey, item.ProductId, prod.Stock); err != nil {
+					fmt.Printf("Failed to update stock in Redis for product %s asynchronously: %v\n", item.ProductId, err)
+				}
+			}
+
 			if err := reports.RecalculateTotalDuplicate(db, item.DuplicateReceiptId); err != nil {
 				fmt.Printf("Failed to recalculate total duplicate asynchronously: %v\n", err)
 			}
@@ -530,17 +534,17 @@ func CreateDuplicateReceiptItem(c *framework.Ctx) error {
 		return responses.InternalServerError(c, "Failed to reduce product stock", err)
 	}
 
-	// Update stock in Redis
-	cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
-	var prod models.Product
-	if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
-		if err := UpdateProductStockInRedis(cacheKey, item.ProductId, prod.Stock); err != nil {
-			fmt.Printf("Failed to update stock in Redis for product %s: %v\n", item.ProductId, err)
-		}
-	}
-
 	// Recalculate total and sync reports asynchronously
 	go func() {
+		// Update stock in Redis
+		cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
+		var prod models.Product
+		if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
+			if err := UpdateProductStockInRedis(cacheKey, item.ProductId, prod.Stock); err != nil {
+				fmt.Printf("Failed to update stock in Redis for product %s asynchronously: %v\n", item.ProductId, err)
+			}
+		}
+
 		if err := reports.RecalculateTotalDuplicate(db, item.DuplicateReceiptId); err != nil {
 			fmt.Printf("Failed to recalculate total duplicate asynchronously: %v\n", err)
 		}
@@ -587,15 +591,6 @@ func UpdateDuplicateReceiptItem(c *framework.Ctx) error {
 		return responses.InternalServerError(c, "Failed to add product stock", err)
 	}
 
-	// Update stock in Redis for old product
-	cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
-	var prod models.Product
-	if err := db.Select("stock").Where("id = ?", existingItem.ProductId).First(&prod).Error; err == nil {
-		if err := UpdateProductStockInRedis(cacheKey, existingItem.ProductId, prod.Stock); err != nil {
-			fmt.Printf("Failed to update stock in Redis for product %s: %v\n", existingItem.ProductId, err)
-		}
-	}
-
 	// Ambil harga jual dari produk baru
 	var product models.Product
 	if err := db.Select("sales_price").Where("id = ?", updatedData.ProductId).First(&product).Error; err != nil {
@@ -605,14 +600,6 @@ func UpdateDuplicateReceiptItem(c *framework.Ctx) error {
 	// Kurangi stok baru
 	if err := tools.ReduceProductStock(db, updatedData.ProductId, updatedData.Qty); err != nil {
 		return responses.InternalServerError(c, "Failed to reduce product stock", err)
-	}
-
-	// Update stock in Redis for new product
-	var newProd models.Product
-	if stockErr := db.Select("stock").Where("id = ?", updatedData.ProductId).First(&newProd).Error; stockErr == nil {
-		if updateErr := UpdateProductStockInRedis(cacheKey, updatedData.ProductId, newProd.Stock); updateErr != nil {
-			fmt.Printf("Failed to update stock in Redis for product %s: %v\n", updatedData.ProductId, updateErr)
-		}
 	}
 
 	// Update item
@@ -625,8 +612,25 @@ func UpdateDuplicateReceiptItem(c *framework.Ctx) error {
 		return responses.InternalServerError(c, "Failed to update sale item", err)
 	}
 
-	// Recalculate total and sync reports asynchronously
+	// Supporting operations asynchronously
 	go func() {
+		cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
+		// Update stock in Redis for old product
+		var oldProd models.Product
+		if err := db.Select("stock").Where("id = ?", existingItem.ProductId).First(&oldProd).Error; err == nil {
+			if err := UpdateProductStockInRedis(cacheKey, existingItem.ProductId, oldProd.Stock); err != nil {
+				fmt.Printf("Failed to update stock in Redis for old product %s asynchronously: %v\n", existingItem.ProductId, err)
+			}
+		}
+
+		// Update stock in Redis for new product
+		var newProd models.Product
+		if err := db.Select("stock").Where("id = ?", updatedData.ProductId).First(&newProd).Error; err == nil {
+			if err := UpdateProductStockInRedis(cacheKey, updatedData.ProductId, newProd.Stock); err != nil {
+				fmt.Printf("Failed to update stock in Redis for new product %s asynchronously: %v\n", updatedData.ProductId, err)
+			}
+		}
+
 		if err := reports.RecalculateTotalDuplicate(db, existingItem.DuplicateReceiptId); err != nil {
 			fmt.Printf("Failed to recalculate total duplicate asynchronously: %v\n", err)
 		}
@@ -664,22 +668,22 @@ func DeleteDuplicateReceiptItem(c *framework.Ctx) error {
 		return responses.InternalServerError(c, "Failed to add product stock", err)
 	}
 
-	// Update stock in Redis
-	cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
-	var prod models.Product
-	if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
-		if err := UpdateProductStockInRedis(cacheKey, item.ProductId, prod.Stock); err != nil {
-			fmt.Printf("Failed to update stock in Redis for product %s: %v\n", item.ProductId, err)
-		}
-	}
-
 	// Hapus item
 	if err := db.Delete(&item).Error; err != nil {
 		return responses.InternalServerError(c, "Failed to delete sale item", err)
 	}
 
-	// Recalculate total asynchronously
+	// Supporting operations asynchronously
 	go func() {
+		// Update stock in Redis
+		cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
+		var prod models.Product
+		if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
+			if err := UpdateProductStockInRedis(cacheKey, item.ProductId, prod.Stock); err != nil {
+				fmt.Printf("Failed to update stock in Redis for product %s asynchronously: %v\n", item.ProductId, err)
+			}
+		}
+
 		if err := reports.RecalculateTotalDuplicate(db, item.DuplicateReceiptId); err != nil {
 			fmt.Printf("Failed to recalculate total duplicate asynchronously: %v\n", err)
 		}

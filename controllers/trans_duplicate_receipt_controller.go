@@ -109,15 +109,16 @@ func CreateDuplicateReceipt(c *framework.Ctx) error {
 
 		// Kurangi stok produk
 		newStock := product.Stock - req.Items[i].Qty
+
+		// Update stock in Redis
+		cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
+		tools.UpdateProductStockInRedisAsync(cacheKey, product.ID, newStock)
+
 		err = tx.Model(&models.Product{}).Where("id = ?", product.ID).Update("stock", newStock).Error
 		if err != nil {
 			tx.Rollback()
 			return responses.InternalServerError(c, fmt.Sprintf("Failed to update stock for product %s", product.Name), err)
 		}
-
-		// Update stock in Redis
-		cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
-		tools.UpdateProductStockInRedisAsync(cacheKey, product.ID, newStock)
 
 		// Kalkulasi total_duplicate_recipe dan profit_estimate dari item-item
 		totalDUR += req.Items[i].SubTotal

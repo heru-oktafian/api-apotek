@@ -175,10 +175,10 @@ func SetTemporaryProductCache(branchID string, products []models.ProdSaleCombo) 
 	return err
 }
 
-// GetTemporaryProductCache mengambil daftar produk sementara dari Redis berdasarkan branch_id
-func GetTemporaryProductCache(branchID string) ([]models.ProdSaleCombo, error) {
+// GetTemporaryProductCache mengambil daftar produk sementara dari Redis berdasarkan cacheKey
+func GetTemporaryProductCache(cacheKey string) ([]models.ProdSaleCombo, error) {
 	ctx := context.Background()
-	key := fmt.Sprintf("tmp:products:sale:%s", branchID)
+	key := fmt.Sprintf("tmp:products:sale:%s", cacheKey)
 	val, err := config.RDB.Get(ctx, key).Result()
 	if err == redis.Nil {
 		return nil, nil // Tidak ada data cache
@@ -193,10 +193,10 @@ func GetTemporaryProductCache(branchID string) ([]models.ProdSaleCombo, error) {
 	return products, nil
 }
 
-// DeleteTemporaryProductCache menghapus cache produk sementara dari Redis berdasarkan branch_id
-func DeleteTemporaryProductCache(branchID string) error {
+// DeleteTemporaryProductCache menghapus cache produk sementara dari Redis berdasarkan cacheKey
+func DeleteTemporaryProductCache(cacheKey string) error {
 	ctx := context.Background()
-	key := fmt.Sprintf("tmp:products:sale:%s", branchID)
+	key := fmt.Sprintf("tmp:products:sale:%s", cacheKey)
 	return config.RDB.Del(ctx, key).Err()
 }
 
@@ -206,6 +206,21 @@ func CmbProdSale(c *framework.Ctx) error {
 	user_id, _ := middlewares.GetUserID(c.Request)
 	search := strings.TrimSpace(c.Query("search"))
 
+	// Buat cacheKey berdasarkan branch_id dan user_id
+	cacheKey := fmt.Sprintf("%v:%v", branch_id, user_id)
+
+	// Cek apakah ada data di Redis terlebih dahulu
+	cachedProducts, err := GetTemporaryProductCache(cacheKey)
+	if err != nil {
+		fmt.Printf("Failed to get product cache for cacheKey %s: %v\n", cacheKey, err)
+		// Lanjutkan ke query database jika gagal ambil cache
+	}
+	if cachedProducts != nil {
+		// Jika ada data di cache, gunakan data tersebut
+		return responses.JSONResponse(c, http.StatusOK, "Combo Products retrieved from cache successfully", cachedProducts)
+	}
+
+	// Jika tidak ada di cache, lakukan query ke database
 	var cmbProducts []models.ProdSaleCombo
 
 	query := config.DB.Table("products").
@@ -224,10 +239,9 @@ func CmbProdSale(c *framework.Ctx) error {
 		return responses.JSONResponse(c, http.StatusInternalServerError, "Get Combo Products failed", err)
 	}
 
-	// Simpan list produk ke Redis dengan branch_id dan user_id
-	cacheKey := fmt.Sprintf("%v:%v", branch_id, user_id)
+	// Simpan list produk ke Redis dengan cacheKey
 	if err := SetTemporaryProductCache(cacheKey, cmbProducts); err != nil {
-		fmt.Printf("Failed to save product cache for branch_id %v and user_id %v: %v\n", branch_id, user_id, err)
+		fmt.Printf("Failed to save product cache for cacheKey %s: %v\n", cacheKey, err)
 	}
 
 	return responses.JSONResponse(c, http.StatusOK, "Combo Products retrieved successfully", cmbProducts)

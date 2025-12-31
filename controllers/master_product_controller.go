@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/heru-oktafian/api-apotek/models"
+	"github.com/heru-oktafian/api-apotek/tools"
 	"github.com/heru-oktafian/scafold/config"
 	"github.com/heru-oktafian/scafold/framework"
 	"github.com/heru-oktafian/scafold/helpers"
@@ -19,10 +21,44 @@ import (
 	"github.com/heru-oktafian/scafold/responses"
 )
 
-// Redis client instance (should be initialized in your app, here for example)
-var redisClient *redis.Client = redis.NewClient(&redis.Options{
-	Addr: "localhost:6379", // adjust as needed
-})
+// Redis client instance
+var redisClient *redis.Client = func() *redis.Client {
+	addr := os.Getenv("REDIS_ADDR")
+	var host, port string
+	if addr != "" {
+		// Parse REDIS_ADDR as host:port
+		parts := strings.Split(addr, ":")
+		if len(parts) == 2 {
+			host = parts[0]
+			port = parts[1]
+		} else {
+			host = "localhost"
+			port = "6379"
+		}
+	} else {
+		host = os.Getenv("REDIS_HOST")
+		if host == "" {
+			host = "localhost"
+		}
+		port = os.Getenv("REDIS_PORT")
+		if port == "" {
+			port = "6379"
+		}
+	}
+	password := os.Getenv("REDIS_PASSWORD")
+	dbStr := os.Getenv("REDIS_DB")
+	db := 0
+	if dbStr != "" {
+		if parsed, err := strconv.Atoi(dbStr); err == nil {
+			db = parsed
+		}
+	}
+	return redis.NewClient(&redis.Options{
+		Addr:     host + ":" + port,
+		Password: password,
+		DB:       db,
+	})
+}()
 
 // CreateProduct buat Product
 func CreateProduct(c *framework.Ctx) error {
@@ -122,20 +158,29 @@ func GetAllProduct(c *framework.Ctx) error {
 // SetTemporaryProductCache menyimpan daftar produk sementara ke Redis dengan branch_id sebagai pembeda
 func SetTemporaryProductCache(branchID string, products []models.ProdSaleCombo) error {
 	ctx := context.Background()
+	// Ping Redis to check connection
+	if _, err := tools.RedisClient.Ping(ctx).Result(); err != nil {
+		fmt.Printf("Redis ping failed: %v\n", err)
+		return err
+	}
 	key := fmt.Sprintf("tmp:products:sale:%s", branchID)
 	data, err := json.Marshal(products)
 	if err != nil {
 		return err
 	}
 	// Set dengan TTL 30 menit
-	return redisClient.Set(ctx, key, data, 30*time.Minute).Err()
+	err = tools.RedisClient.Set(ctx, key, data, 30*time.Minute).Err()
+	if err == nil {
+		fmt.Printf("Successfully saved product cache to Redis key: %s\n", key)
+	}
+	return err
 }
 
 // GetTemporaryProductCache mengambil daftar produk sementara dari Redis berdasarkan branch_id
 func GetTemporaryProductCache(branchID string) ([]models.ProdSaleCombo, error) {
 	ctx := context.Background()
 	key := fmt.Sprintf("tmp:products:sale:%s", branchID)
-	val, err := redisClient.Get(ctx, key).Result()
+	val, err := tools.RedisClient.Get(ctx, key).Result()
 	if err == redis.Nil {
 		return nil, nil // Tidak ada data cache
 	}
@@ -153,7 +198,7 @@ func GetTemporaryProductCache(branchID string) ([]models.ProdSaleCombo, error) {
 func DeleteTemporaryProductCache(branchID string) error {
 	ctx := context.Background()
 	key := fmt.Sprintf("tmp:products:sale:%s", branchID)
-	return redisClient.Del(ctx, key).Err()
+	return tools.RedisClient.Del(ctx, key).Err()
 }
 
 // CmbProdSale mengembalikan daftar produk untuk combo box transaksi penjualan

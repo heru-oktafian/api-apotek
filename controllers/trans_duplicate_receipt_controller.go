@@ -24,8 +24,17 @@ import (
 // UpdateProductStockInRedis updates the product stock in Redis cache with branch and user context
 func UpdateProductStockInRedis(branchID, userID, productID string, stock int) error {
 	ctx := context.Background()
+	// Ping Redis to check connection
+	if _, err := tools.RedisClient.Ping(ctx).Result(); err != nil {
+		fmt.Printf("Redis ping failed: %v\n", err)
+		return err
+	}
 	key := fmt.Sprintf("product:stock:%s:%s:%s", branchID, userID, productID)
-	return redisClient.Set(ctx, key, stock, 30*time.Minute).Err()
+	err := tools.RedisClient.Set(ctx, key, stock, 30*time.Minute).Err()
+	if err == nil {
+		fmt.Printf("Successfully updated product stock in Redis key: %s with stock: %d\n", key, stock)
+	}
+	return err
 }
 
 // CreateDuplicateReceipt handles the creation of a new duplicate receipt record.

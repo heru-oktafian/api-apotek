@@ -159,13 +159,8 @@ func DeleteTemporaryProductCache(branchID string) error {
 // CmbProdSale mengembalikan daftar produk untuk combo box transaksi penjualan
 func CmbProdSale(c *framework.Ctx) error {
 	branch_id, _ := middlewares.GetBranchID(c.Request)
+	user_id, _ := middlewares.GetUserID(c.Request)
 	search := strings.TrimSpace(c.Query("search"))
-
-	// Cek cache Redis terlebih dahulu
-	cached, err := GetTemporaryProductCache(fmt.Sprintf("%v", branch_id))
-	if err == nil && cached != nil && search == "" {
-		return responses.JSONResponse(c, http.StatusOK, "Combo Products retrieved successfully (from cache)", cached)
-	}
 
 	var cmbProducts []models.ProdSaleCombo
 
@@ -185,16 +180,10 @@ func CmbProdSale(c *framework.Ctx) error {
 		return responses.JSONResponse(c, http.StatusInternalServerError, "Get Combo Products failed", err)
 	}
 
-	// Simpan ke cache jika tanpa search
-	if search == "" {
-		_ = SetTemporaryProductCache(fmt.Sprintf("%v", branch_id), cmbProducts)
-		// Log data yang disimpan ke Redis
-		data, err := json.Marshal(cmbProducts)
-		if err == nil {
-			fmt.Printf("Temporary product cache saved for branch_id %v: %s\n", branch_id, string(data))
-		} else {
-			fmt.Printf("Failed to marshal product cache for branch_id %v: %v\n", branch_id, err)
-		}
+	// Simpan list produk ke Redis dengan branch_id dan user_id
+	cacheKey := fmt.Sprintf("%v:%v", branch_id, user_id)
+	if err := SetTemporaryProductCache(cacheKey, cmbProducts); err != nil {
+		fmt.Printf("Failed to save product cache for branch_id %v and user_id %v: %v\n", branch_id, user_id, err)
 	}
 
 	return responses.JSONResponse(c, http.StatusOK, "Combo Products retrieved successfully", cmbProducts)

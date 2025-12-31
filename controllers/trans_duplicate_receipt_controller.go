@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"net/http"
@@ -19,6 +20,13 @@ import (
 	"github.com/heru-oktafian/scafold/utils"
 	"gorm.io/gorm"
 )
+
+// UpdateProductStockInRedis updates the product stock in Redis cache with branch and user context
+func UpdateProductStockInRedis(branchID, userID, productID string, stock int) error {
+	ctx := context.Background()
+	key := fmt.Sprintf("product:stock:%s:%s:%s", branchID, userID, productID)
+	return redisClient.Set(ctx, key, stock, 30*time.Minute).Err()
+}
 
 // CreateDuplicateReceipt handles the creation of a new duplicate receipt record.
 func CreateDuplicateReceipt(c *framework.Ctx) error {
@@ -113,6 +121,11 @@ func CreateDuplicateReceipt(c *framework.Ctx) error {
 		if err != nil {
 			tx.Rollback()
 			return responses.InternalServerError(c, fmt.Sprintf("Failed to update stock for product %s", product.Name), err)
+		}
+
+		// Update stock in Redis
+		if err := UpdateProductStockInRedis(branchID, userID, product.ID, newStock); err != nil {
+			fmt.Printf("Failed to update stock in Redis for product %s: %v\n", product.ID, err)
 		}
 
 		// Kalkulasi total_duplicate_recipe dan profit_estimate dari item-item
@@ -366,6 +379,13 @@ func DeleteDuplicateReceipt(c *framework.Ctx) error {
 	if err := db.Where("duplicate_receipt_id = ?", id).Find(&items).Error; err == nil {
 		for _, item := range items {
 			_ = tools.SubtractProductStock(db, item.ProductId, item.Qty)
+			// Update stock in Redis
+			var prod models.Product
+			if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
+				if err := UpdateProductStockInRedis(duplicate_receipt.BranchID, duplicate_receipt.UserID, item.ProductId, prod.Stock); err != nil {
+					fmt.Printf("Failed to update stock in Redis for product %s: %v\n", item.ProductId, err)
+				}
+			}
 		}
 		db.Where("duplicate_receipt_id = ?", id).Delete(&models.DuplicateReceiptItems{})
 	}
@@ -431,6 +451,14 @@ func CreateDuplicateReceiptItem(c *framework.Ctx) error {
 			return responses.InternalServerError(c, "Failed to reduce product stock", err)
 		}
 
+		// Update stock in Redis
+		var prod models.Product
+		if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
+			if err := UpdateProductStockInRedis(branchID, userID, item.ProductId, prod.Stock); err != nil {
+				fmt.Printf("Failed to update stock in Redis for product %s: %v\n", item.ProductId, err)
+			}
+		}
+
 		if err := reports.RecalculateTotalDuplicate(db, item.DuplicateReceiptId); err != nil {
 			return responses.InternalServerError(c, "Failed to recalculate total sale", err)
 		}
@@ -459,6 +487,14 @@ func CreateDuplicateReceiptItem(c *framework.Ctx) error {
 
 	if err := tools.ReduceProductStock(db, item.ProductId, item.Qty); err != nil {
 		return responses.InternalServerError(c, "Failed to reduce product stock", err)
+	}
+
+	// Update stock in Redis
+	var prod models.Product
+	if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
+		if err := UpdateProductStockInRedis(branchID, userID, item.ProductId, prod.Stock); err != nil {
+			fmt.Printf("Failed to update stock in Redis for product %s: %v\n", item.ProductId, err)
+		}
 	}
 
 	if err := reports.RecalculateTotalDuplicate(db, item.DuplicateReceiptId); err != nil {
@@ -503,6 +539,14 @@ func UpdateDuplicateReceiptItem(c *framework.Ctx) error {
 		return responses.InternalServerError(c, "Failed to add product stock", err)
 	}
 
+	// Update stock in Redis for old product
+	var prod models.Product
+	if err := db.Select("stock").Where("id = ?", existingItem.ProductId).First(&prod).Error; err == nil {
+		if err := UpdateProductStockInRedis(branchID, userID, existingItem.ProductId, prod.Stock); err != nil {
+			fmt.Printf("Failed to update stock in Redis for product %s: %v\n", existingItem.ProductId, err)
+		}
+	}
+
 	// Ambil harga jual dari produk baru
 	var product models.Product
 	if err := db.Select("sales_price").Where("id = ?", updatedData.ProductId).First(&product).Error; err != nil {
@@ -512,6 +556,13 @@ func UpdateDuplicateReceiptItem(c *framework.Ctx) error {
 	// Kurangi stok baru
 	if err := tools.ReduceProductStock(db, updatedData.ProductId, updatedData.Qty); err != nil {
 		return responses.InternalServerError(c, "Failed to reduce product stock", err)
+	}
+
+	// Update stock in Redis for new product
+	if err := db.Select("stock").Where("id = ?", updatedData.ProductId).First(&prod).Error; err == nil {
+		if err := UpdateProductStockInRedis(branchID, userID, updatedData.ProductId, prod.Stock); err != nil {
+			fmt.Printf("Failed to update stock in Redis for product %s: %v\n", updatedData.ProductId, err)
+		}
 	}
 
 	// Update item
@@ -544,6 +595,9 @@ func DeleteDuplicateReceiptItem(c *framework.Ctx) error {
 	db := config.DB
 	id := c.Param("id")
 
+	branchID, _ := middlewares.GetBranchID(c.Request)
+	userID, _ := middlewares.GetUserID(c.Request)
+
 	var item models.DuplicateReceiptItems
 	if err := db.First(&item, "id = ?", id).Error; err != nil {
 		return responses.NotFound(c, "Item not found")
@@ -552,6 +606,14 @@ func DeleteDuplicateReceiptItem(c *framework.Ctx) error {
 	// Rollback stok
 	if err := tools.AddProductStock(db, item.ProductId, item.Qty); err != nil {
 		return responses.InternalServerError(c, "Failed to add product stock", err)
+	}
+
+	// Update stock in Redis
+	var prod models.Product
+	if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
+		if err := UpdateProductStockInRedis(branchID, userID, item.ProductId, prod.Stock); err != nil {
+			fmt.Printf("Failed to update stock in Redis for product %s: %v\n", item.ProductId, err)
+		}
 	}
 
 	// Hapus item

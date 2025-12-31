@@ -64,7 +64,7 @@ func GetAllBranch(c *framework.Ctx) error {
 	// Pencarian berdasarkan branch_name, address, phone, email, owner_name, bank_name atau account_name
 	if search != "" {
 		// search = strings.ToLower(search) // Konversi search ke lowercase
-		db = db.Where("branch_name LIKE ? OR address LIKE ? OR phone LIKE ? OR email LIKE ? OR owner_name LIKE ? OR bank_name LIKE ? OR account_name LIKE ?", "%"+search+"%", "%"+search+"%", "%"+search+"%", "%"+search+"%", "%"+search+"%", "%"+search+"%", "%"+search+"%")
+		db = db.Where("branch_name LIKE ? OR address LIKE ? OR phone LIKE ? OR email LIKE ? OR bank_name LIKE ? OR account_name LIKE ?", "%"+search+"%", "%"+search+"%", "%"+search+"%", "%"+search+"%", "%"+search+"%", "%"+search+"%")
 	}
 
 	var branches []models.Branch

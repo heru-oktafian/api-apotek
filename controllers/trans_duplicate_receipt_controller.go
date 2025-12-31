@@ -378,6 +378,7 @@ func DeleteDuplicateReceipt(c *framework.Ctx) error {
 				var prod models.Product
 				if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
 					tools.UpdateProductStockInRedisAsync(cacheKey, item.ProductId, prod.Stock)
+					tools.UpdatePurchaseProductStockInRedisAsync(cacheKey, item.ProductId, prod.Stock)
 				}
 			}
 		}(items)

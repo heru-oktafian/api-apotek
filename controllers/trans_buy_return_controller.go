@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/heru-oktafian/api-apotek/models"
+	"github.com/heru-oktafian/api-apotek/tools"
 	"github.com/heru-oktafian/scafold/config"
 	"github.com/heru-oktafian/scafold/framework"
 	"github.com/heru-oktafian/scafold/helpers"
@@ -242,6 +243,17 @@ func CreateBuyReturnTransaction(c *framework.Ctx) error {
 	if err != nil {
 		return responses.JSONResponse(c, http.StatusInternalServerError, "Gagal melakukan commit transaksi", err.Error())
 	}
+
+	// Update cache purchase products asynchronously
+	go func() {
+		cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
+		for _, item := range req.BuyReturnItems {
+			var prod models.Product
+			if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
+				tools.UpdatePurchaseProductStockInRedisAsync(cacheKey, item.ProductId, prod.Stock)
+			}
+		}
+	}()
 
 	return responses.JSONResponse(c, http.StatusOK, "Transaksi retur pembelian berhasil dibuat", framework.Map{
 		"id":           buyReturn.ID,

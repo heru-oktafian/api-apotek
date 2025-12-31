@@ -182,6 +182,19 @@ func DeleteFirstStock(c *framework.Ctx) error {
 		return responses.InternalServerError(c, "Failed to delete FirstStock", err)
 	}
 
+	// Update cache purchase products asynchronously
+	go func() {
+		branchID, _ := middlewares.GetBranchID(c.Request)
+		userID, _ := middlewares.GetUserID(c.Request)
+		cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
+		for _, item := range items {
+			var prod models.Product
+			if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
+				tools.UpdatePurchaseProductStockInRedisAsync(cacheKey, item.ProductId, prod.Stock)
+			}
+		}
+	}()
+
 	return responses.JSONResponse(c, http.StatusOK, "FirstStock deleted successfully", first_stock)
 }
 
@@ -224,7 +237,7 @@ func CreateFirstStockItem(c *framework.Ctx) error {
 			cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
 			var prod models.Product
 			if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
-				tools.UpdateProductStockInRedisAsync(cacheKey, item.ProductId, prod.Stock)
+				tools.UpdatePurchaseProductStockInRedisAsync(cacheKey, item.ProductId, prod.Stock)
 			}
 
 			if err := RecalculateTotalFirstStock(db, item.FirstStockId); err != nil {
@@ -265,7 +278,7 @@ func CreateFirstStockItem(c *framework.Ctx) error {
 		cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
 		var prod models.Product
 		if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
-			tools.UpdateProductStockInRedisAsync(cacheKey, item.ProductId, prod.Stock)
+			tools.UpdatePurchaseProductStockInRedisAsync(cacheKey, item.ProductId, prod.Stock)
 		}
 
 		if err := RecalculateTotalFirstStock(db, item.FirstStockId); err != nil {
@@ -326,14 +339,14 @@ func UpdateFirstStockItem(c *framework.Ctx) error {
 		// Update stock for new product
 		var newProd models.Product
 		if err := db.Select("stock").Where("id = ?", updatedItem.ProductId).First(&newProd).Error; err == nil {
-			tools.UpdateProductStockInRedisAsync(cacheKey, updatedItem.ProductId, newProd.Stock)
+			tools.UpdatePurchaseProductStockInRedisAsync(cacheKey, updatedItem.ProductId, newProd.Stock)
 		}
 
 		// Update stock for old product if different
 		if updatedItem.ProductId != existingItem.ProductId {
 			var oldProd models.Product
 			if err := db.Select("stock").Where("id = ?", existingItem.ProductId).First(&oldProd).Error; err == nil {
-				tools.UpdateProductStockInRedisAsync(cacheKey, existingItem.ProductId, oldProd.Stock)
+				tools.UpdatePurchaseProductStockInRedisAsync(cacheKey, existingItem.ProductId, oldProd.Stock)
 			}
 		}
 
@@ -373,7 +386,7 @@ func DeleteFirstStockItem(c *framework.Ctx) error {
 		cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
 		var prod models.Product
 		if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
-			tools.UpdateProductStockInRedisAsync(cacheKey, item.ProductId, prod.Stock)
+			tools.UpdatePurchaseProductStockInRedisAsync(cacheKey, item.ProductId, prod.Stock)
 		}
 
 		if err := RecalculateTotalFirstStock(db, item.FirstStockId); err != nil {
@@ -778,6 +791,17 @@ func CreateFirstStockTransaction(c *framework.Ctx) error {
 	if err != nil {
 		return responses.InternalServerError(c, "Failed to commit database transaction for first stock", err)
 	}
+
+	// Update cache purchase products asynchronously
+	go func() {
+		cacheKey := fmt.Sprintf("%s:%s", firstStockHeader.BranchID, firstStockHeader.UserID)
+		for _, item := range firstStockItemsToCreate {
+			var prod models.Product
+			if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
+				tools.UpdatePurchaseProductStockInRedisAsync(cacheKey, item.ProductId, prod.Stock)
+			}
+		}
+	}()
 
 	// --- Mengkonstruksi Objek Respon ---
 	response := FirstStockTransactionResponse{

@@ -256,20 +256,32 @@ func CreatePurchaseItem(c *framework.Ctx) error {
 			return responses.InternalServerError(c, "Failed to update existing item", err)
 		}
 
-		// Tambah stok
-		if err := tools.AddProductStock(db, item.ProductId, item.Qty); err != nil {
-			return responses.InternalServerError(c, "Failed to add product stock", err)
-		}
+		// Supporting operations asynchronously
+		go func() {
+			// Tambah stok
+			if err := tools.AddProductStock(db, item.ProductId, item.Qty); err != nil {
+				fmt.Printf("Failed to add product stock asynchronously: %v\n", err)
+			}
 
-		// Update harga produk jika harga baru lebih tinggi dari yang tersimpan di tabel products
-		if err := tools.UpdateProductPriceIfHigher(db, item.ProductId, item.Price); err != nil {
-			return responses.InternalServerError(c, "Failed to update product price", err)
-		}
+			// Update harga produk jika harga baru lebih tinggi dari yang tersimpan di tabel products
+			if err := tools.UpdateProductPriceIfHigher(db, item.ProductId, item.Price); err != nil {
+				fmt.Printf("Failed to update product price asynchronously: %v\n", err)
+			}
 
-		// Recalculate total pembelian
-		if err := tools.RecalculateTotalPurchase(db, item.PurchaseId); err != nil {
-			return responses.InternalServerError(c, "Failed to recalculate total purchase", err)
-		}
+			// Recalculate total pembelian
+			if err := tools.RecalculateTotalPurchase(db, item.PurchaseId); err != nil {
+				fmt.Printf("Failed to recalculate total purchase asynchronously: %v\n", err)
+			}
+
+			// Update cache purchase products
+			branchID, _ := middlewares.GetBranchID(c.Request)
+			userID, _ := middlewares.GetUserID(c.Request)
+			cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
+			var prod models.Product
+			if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
+				tools.UpdatePurchaseProductStockInRedisAsync(cacheKey, item.ProductId, prod.Stock)
+			}
+		}()
 
 		return responses.JSONResponse(c, http.StatusOK, "Item updated successfully", existing)
 
@@ -287,18 +299,33 @@ func CreatePurchaseItem(c *framework.Ctx) error {
 	if err := db.Create(&item).Error; err != nil {
 		return responses.InternalServerError(c, "Failed to create item", err)
 	}
-	// Tambah stok
-	if err := tools.AddProductStock(db, item.ProductId, item.Qty); err != nil {
-		return responses.InternalServerError(c, "Failed to add product stock", err)
-	}
 
-	if err := tools.UpdateProductPriceIfHigher(db, item.ProductId, item.Price); err != nil {
-		return responses.InternalServerError(c, "Failed to update product price", err)
-	}
+	// Supporting operations asynchronously
+	go func() {
+		// Tambah stok
+		if err := tools.AddProductStock(db, item.ProductId, item.Qty); err != nil {
+			fmt.Printf("Failed to add product stock asynchronously: %v\n", err)
+		}
 
-	if err := tools.RecalculateTotalPurchase(db, item.PurchaseId); err != nil {
-		return responses.InternalServerError(c, "Failed to recalculate total purchase", err)
-	}
+		// Update harga produk jika harga baru lebih tinggi
+		if err := tools.UpdateProductPriceIfHigher(db, item.ProductId, item.Price); err != nil {
+			fmt.Printf("Failed to update product price asynchronously: %v\n", err)
+		}
+
+		// Recalculate total pembelian
+		if err := tools.RecalculateTotalPurchase(db, item.PurchaseId); err != nil {
+			fmt.Printf("Failed to recalculate total purchase asynchronously: %v\n", err)
+		}
+
+		// Update cache purchase products
+		branchID, _ := middlewares.GetBranchID(c.Request)
+		userID, _ := middlewares.GetUserID(c.Request)
+		cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
+		var prod models.Product
+		if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
+			tools.UpdatePurchaseProductStockInRedisAsync(cacheKey, item.ProductId, prod.Stock)
+		}
+	}()
 
 	return responses.JSONResponse(c, http.StatusOK, "Item added successfully", item)
 }
@@ -349,15 +376,35 @@ func UpdatePurchaseItem(c *framework.Ctx) error {
 		return responses.InternalServerError(c, "Failed to update item", err)
 	}
 
-	// Update harga produk jika harga item lebih tinggi
-	if err := tools.UpdateProductPriceIfHigher(db, updatedItem.ProductId, updatedItem.Price); err != nil {
-		return responses.InternalServerError(c, "Failed to update product price", err)
-	}
+	// Supporting operations asynchronously
+	go func() {
+		// Update harga produk jika harga item lebih tinggi
+		if err := tools.UpdateProductPriceIfHigher(db, updatedItem.ProductId, updatedItem.Price); err != nil {
+			fmt.Printf("Failed to update product price asynchronously: %v\n", err)
+		}
 
-	// Recalculate total & sync
-	if err := tools.RecalculateTotalPurchase(db, existingItem.PurchaseId); err != nil {
-		return responses.InternalServerError(c, "Failed to recalculate total purchase", err)
-	}
+		// Recalculate total & sync
+		if err := tools.RecalculateTotalPurchase(db, existingItem.PurchaseId); err != nil {
+			fmt.Printf("Failed to recalculate total purchase asynchronously: %v\n", err)
+		}
+
+		// Update cache purchase products for old and new products
+		branchID, _ := middlewares.GetBranchID(c.Request)
+		userID, _ := middlewares.GetUserID(c.Request)
+		cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
+
+		// Update for old product
+		var oldProd models.Product
+		if err := db.Select("stock").Where("id = ?", existingItem.ProductId).First(&oldProd).Error; err == nil {
+			tools.UpdatePurchaseProductStockInRedisAsync(cacheKey, existingItem.ProductId, oldProd.Stock)
+		}
+
+		// Update for new product
+		var newProd models.Product
+		if err := db.Select("stock").Where("id = ?", updatedItem.ProductId).First(&newProd).Error; err == nil {
+			tools.UpdatePurchaseProductStockInRedisAsync(cacheKey, updatedItem.ProductId, newProd.Stock)
+		}
+	}()
 
 	return responses.JSONResponse(c, http.StatusOK, "Item updated successfully", existingItem)
 }
@@ -391,10 +438,22 @@ func DeletePurchaseItem(c *framework.Ctx) error {
 		return responses.InternalServerError(c, "Failed to delete item", err)
 	}
 
-	// Recalculate total
-	if err := tools.RecalculateTotalPurchase(db, item.PurchaseId); err != nil {
-		return responses.InternalServerError(c, "Failed to recalculate total purchase", err)
-	}
+	// Supporting operations asynchronously
+	go func() {
+		// Recalculate total
+		if err := tools.RecalculateTotalPurchase(db, item.PurchaseId); err != nil {
+			fmt.Printf("Failed to recalculate total purchase asynchronously: %v\n", err)
+		}
+
+		// Update cache purchase products
+		branchID, _ := middlewares.GetBranchID(c.Request)
+		userID, _ := middlewares.GetUserID(c.Request)
+		cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
+		var prod models.Product
+		if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
+			tools.UpdatePurchaseProductStockInRedisAsync(cacheKey, item.ProductId, prod.Stock)
+		}
+	}()
 
 	return responses.JSONResponse(c, http.StatusOK, "Item deleted successfully", item)
 }

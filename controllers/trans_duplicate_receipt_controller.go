@@ -116,7 +116,7 @@ func CreateDuplicateReceipt(c *framework.Ctx) error {
 		}
 
 		// Update stock in Redis
-		cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
+		cacheKey := fmt.Sprintf("%s:%s:%s", branchID, userID, newStock)
 		tools.UpdateProductStockInRedisAsync(cacheKey, product.ID, newStock)
 
 		// Kalkulasi total_duplicate_recipe dan profit_estimate dari item-item

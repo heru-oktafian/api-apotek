@@ -122,6 +122,10 @@ func CreateSaleTransaction(c *framework.Ctx) error {
 			return responses.InternalServerError(c, fmt.Sprintf("Failed to update stock for product %s", product.Name), err)
 		}
 
+		// Update stock in Redis synchronously
+		cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
+		tools.UpdateProductStockInRedisSync(cacheKey, product.ID, newStock)
+
 		// Kalkulasi total_sale dan profit_estimate dari item_sales
 		calculatedTotalSale += req.SaleItems[i].SubTotal
 		// Profit per item = (Harga Jual - Harga Beli) * Qty

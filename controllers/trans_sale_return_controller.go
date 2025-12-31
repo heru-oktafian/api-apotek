@@ -231,7 +231,7 @@ func CreateSaleReturnTransaction(c *framework.Ctx) error {
 	for _, item := range req.SaleReturnItems {
 		var prod models.Product
 		if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
-			tools.UpdateProductStockInRedisAsync(cacheKey, item.ProductId, prod.Stock)
+			tools.UpdateProductStockInRedisSync(cacheKey, item.ProductId, prod.Stock)
 		}
 	}
 

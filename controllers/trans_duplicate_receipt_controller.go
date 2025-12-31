@@ -25,12 +25,12 @@ import (
 func UpdateProductStockInRedis(branchID, userID, productID string, stock int) error {
 	ctx := context.Background()
 	// Ping Redis to check connection
-	if _, err := tools.RedisClient.Ping(ctx).Result(); err != nil {
+	if _, err := config.RDB.Ping(ctx).Result(); err != nil {
 		fmt.Printf("Redis ping failed: %v\n", err)
 		return err
 	}
 	key := fmt.Sprintf("product:stock:%s:%s:%s", branchID, userID, productID)
-	err := tools.RedisClient.Set(ctx, key, stock, 30*time.Minute).Err()
+	err := config.RDB.Set(ctx, key, stock, 30*time.Minute).Err()
 	if err == nil {
 		fmt.Printf("Successfully updated product stock in Redis key: %s with stock: %d\n", key, stock)
 	}

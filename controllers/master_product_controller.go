@@ -13,7 +13,6 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	"github.com/heru-oktafian/api-apotek/models"
-	"github.com/heru-oktafian/api-apotek/tools"
 	"github.com/heru-oktafian/scafold/config"
 	"github.com/heru-oktafian/scafold/framework"
 	"github.com/heru-oktafian/scafold/helpers"
@@ -159,7 +158,7 @@ func GetAllProduct(c *framework.Ctx) error {
 func SetTemporaryProductCache(branchID string, products []models.ProdSaleCombo) error {
 	ctx := context.Background()
 	// Ping Redis to check connection
-	if _, err := tools.RedisClient.Ping(ctx).Result(); err != nil {
+	if _, err := config.RDB.Ping(ctx).Result(); err != nil {
 		fmt.Printf("Redis ping failed: %v\n", err)
 		return err
 	}
@@ -169,7 +168,7 @@ func SetTemporaryProductCache(branchID string, products []models.ProdSaleCombo) 
 		return err
 	}
 	// Set dengan TTL 30 menit
-	err = tools.RedisClient.Set(ctx, key, data, 30*time.Minute).Err()
+	err = config.RDB.Set(ctx, key, data, 30*time.Minute).Err()
 	if err == nil {
 		fmt.Printf("Successfully saved product cache to Redis key: %s\n", key)
 	}
@@ -180,7 +179,7 @@ func SetTemporaryProductCache(branchID string, products []models.ProdSaleCombo) 
 func GetTemporaryProductCache(branchID string) ([]models.ProdSaleCombo, error) {
 	ctx := context.Background()
 	key := fmt.Sprintf("tmp:products:sale:%s", branchID)
-	val, err := tools.RedisClient.Get(ctx, key).Result()
+	val, err := config.RDB.Get(ctx, key).Result()
 	if err == redis.Nil {
 		return nil, nil // Tidak ada data cache
 	}
@@ -198,7 +197,7 @@ func GetTemporaryProductCache(branchID string) ([]models.ProdSaleCombo, error) {
 func DeleteTemporaryProductCache(branchID string) error {
 	ctx := context.Background()
 	key := fmt.Sprintf("tmp:products:sale:%s", branchID)
-	return tools.RedisClient.Del(ctx, key).Err()
+	return config.RDB.Del(ctx, key).Err()
 }
 
 // CmbProdSale mengembalikan daftar produk untuk combo box transaksi penjualan

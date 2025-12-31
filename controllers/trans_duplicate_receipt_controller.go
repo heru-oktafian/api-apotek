@@ -112,8 +112,7 @@ func CreateDuplicateReceipt(c *framework.Ctx) error {
 
 		// Update stock in Redis
 		cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
-		fmt.Printf("Calling UpdateProductStockInRedisAsync for product %s with stock %d\n", product.ID, newStock)
-		tools.UpdateProductStockInRedisAsync(cacheKey, product.ID, newStock)
+		tools.UpdateProductStockInRedisSync(cacheKey, product.ID, newStock)
 
 		err = tx.Model(&models.Product{}).Where("id = ?", product.ID).Update("stock", newStock).Error
 		if err != nil {

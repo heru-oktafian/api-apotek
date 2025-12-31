@@ -183,10 +183,10 @@ func DeleteFirstStock(c *framework.Ctx) error {
 	}
 
 	// Update cache purchase products asynchronously
+	branchID, _ := middlewares.GetBranchID(c.Request)
+	userID, _ := middlewares.GetUserID(c.Request)
+	cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
 	go func() {
-		branchID, _ := middlewares.GetBranchID(c.Request)
-		userID, _ := middlewares.GetUserID(c.Request)
-		cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
 		for _, item := range items {
 			var prod models.Product
 			if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
@@ -230,11 +230,11 @@ func CreateFirstStockItem(c *framework.Ctx) error {
 		}
 
 		// Supporting operations asynchronously
+		branchID, _ := middlewares.GetBranchID(c.Request)
+		userID, _ := middlewares.GetUserID(c.Request)
+		cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
 		go func() {
 			// Update stock in Redis
-			branchID, _ := middlewares.GetBranchID(c.Request)
-			userID, _ := middlewares.GetUserID(c.Request)
-			cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
 			var prod models.Product
 			if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
 				tools.UpdatePurchaseProductStockInRedisAsync(cacheKey, item.ProductId, prod.Stock)
@@ -271,11 +271,11 @@ func CreateFirstStockItem(c *framework.Ctx) error {
 	}
 
 	// Supporting operations asynchronously
+	branchID, _ := middlewares.GetBranchID(c.Request)
+	userID, _ := middlewares.GetUserID(c.Request)
+	cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
 	go func() {
 		// Update stock in Redis
-		branchID, _ := middlewares.GetBranchID(c.Request)
-		userID, _ := middlewares.GetUserID(c.Request)
-		cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
 		var prod models.Product
 		if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
 			tools.UpdatePurchaseProductStockInRedisAsync(cacheKey, item.ProductId, prod.Stock)
@@ -330,11 +330,11 @@ func UpdateFirstStockItem(c *framework.Ctx) error {
 	}
 
 	// Supporting operations asynchronously
+	branchID, _ := middlewares.GetBranchID(c.Request)
+	userID, _ := middlewares.GetUserID(c.Request)
+	cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
 	go func() {
 		// Update stock in Redis for both old and new products
-		branchID, _ := middlewares.GetBranchID(c.Request)
-		userID, _ := middlewares.GetUserID(c.Request)
-		cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
 
 		// Update stock for new product
 		var newProd models.Product
@@ -379,11 +379,11 @@ func DeleteFirstStockItem(c *framework.Ctx) error {
 	}
 
 	// Supporting operations asynchronously
+	branchID, _ := middlewares.GetBranchID(c.Request)
+	userID, _ := middlewares.GetUserID(c.Request)
+	cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
 	go func() {
 		// Update stock in Redis
-		branchID, _ := middlewares.GetBranchID(c.Request)
-		userID, _ := middlewares.GetUserID(c.Request)
-		cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
 		var prod models.Product
 		if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
 			tools.UpdatePurchaseProductStockInRedisAsync(cacheKey, item.ProductId, prod.Stock)
@@ -793,12 +793,12 @@ func CreateFirstStockTransaction(c *framework.Ctx) error {
 	}
 
 	// Update cache purchase products asynchronously
+	cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
 	go func() {
-		cacheKey := fmt.Sprintf("%s:%s", firstStockHeader.BranchID, firstStockHeader.UserID)
 		for _, item := range firstStockItemsToCreate {
 			var prod models.Product
 			if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
-				tools.UpdatePurchaseProductStockInRedisAsync(cacheKey, item.ProductId, prod.Stock)
+				tools.UpdatePurchaseProductStockInRedisSync(cacheKey, item.ProductId, prod.Stock)
 			}
 		}
 	}()

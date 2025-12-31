@@ -1,11 +1,17 @@
 package tools
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/heru-oktafian/api-apotek/models"
+	"github.com/heru-oktafian/scafold/config"
 )
 
 // Redis client instance
@@ -46,3 +52,49 @@ var RedisClient *redis.Client = func() *redis.Client {
 		DB:       db,
 	})
 }()
+
+// SetTemporaryProductCache menyimpan daftar produk sementara ke Redis dengan cacheKey sebagai pembeda
+func SetTemporaryProductCache(cacheKey string, products []models.ProdSaleCombo) error {
+	ctx := context.Background()
+	// Ping Redis to check connection
+	if _, err := config.RDB.Ping(ctx).Result(); err != nil {
+		fmt.Printf("Redis ping failed: %v\n", err)
+		return err
+	}
+	key := fmt.Sprintf("tmp:products:sale:%s", cacheKey)
+	data, err := json.Marshal(products)
+	if err != nil {
+		return err
+	}
+	// Set dengan TTL 30 menit
+	err = config.RDB.Set(ctx, key, data, 30*time.Minute).Err()
+	if err == nil {
+		fmt.Printf("Successfully saved product cache to Redis key: %s\n", key)
+	}
+	return err
+}
+
+// GetTemporaryProductCache mengambil daftar produk sementara dari Redis berdasarkan cacheKey
+func GetTemporaryProductCache(cacheKey string) ([]models.ProdSaleCombo, error) {
+	ctx := context.Background()
+	key := fmt.Sprintf("tmp:products:sale:%s", cacheKey)
+	val, err := config.RDB.Get(ctx, key).Result()
+	if err == redis.Nil {
+		return nil, nil // Tidak ada data cache
+	}
+	if err != nil {
+		return nil, err
+	}
+	var products []models.ProdSaleCombo
+	if err := json.Unmarshal([]byte(val), &products); err != nil {
+		return nil, err
+	}
+	return products, nil
+}
+
+// DeleteTemporaryProductCache menghapus cache produk sementara dari Redis berdasarkan cacheKey
+func DeleteTemporaryProductCache(cacheKey string) error {
+	ctx := context.Background()
+	key := fmt.Sprintf("tmp:products:sale:%s", cacheKey)
+	return config.RDB.Del(ctx, key).Err()
+}

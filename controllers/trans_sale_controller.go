@@ -452,15 +452,30 @@ func CreateSaleItem(c *framework.Ctx) error {
 			return responses.InternalServerError(c, "Failed to reduce product stock", err)
 		}
 
-		if err := reports.RecalculateTotalSale(db, item.SaleId); err != nil {
-			return responses.InternalServerError(c, "Failed to recalculate total sale", err)
-		}
+		// Supporting operations asynchronously
+		go func() {
+			// Update stock in Redis
+			cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
+			var prod models.Product
+			if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
+				tools.UpdateProductStockInRedisAsync(cacheKey, item.ProductId, prod.Stock)
+			}
 
-		// Sync laporan profit harian
-		var sale models.Sales
-		if err := db.First(&sale, "id = ?", item.SaleId).Error; err != nil {
-			return responses.InternalServerError(c, "Failed to fetch sale", err)
-		}
+			if err := reports.RecalculateTotalSale(db, item.SaleId); err != nil {
+				fmt.Printf("Failed to recalculate total sale asynchronously: %v\n", err)
+			}
+
+			// Sync laporan profit harian
+			var sale models.Sales
+			if err := db.First(&sale, "id = ?", item.SaleId).Error; err != nil {
+				fmt.Printf("Failed to fetch sale asynchronously: %v\n", err)
+				return
+			}
+
+			if err := reports.SyncDailyProfitReport(db, branchID, userID, sale.SaleDate, sale.TotalSale, sale.ProfitEstimate, 0, 0); err != nil {
+				fmt.Printf("Failed to sync daily profit report asynchronously: %v\n", err)
+			}
+		}()
 
 		return responses.JSONResponse(c, http.StatusOK, "Item updated successfully", existing)
 
@@ -482,17 +497,28 @@ func CreateSaleItem(c *framework.Ctx) error {
 		return responses.InternalServerError(c, "Failed to reduce product stock", err)
 	}
 
-	if err := reports.RecalculateTotalSale(db, item.SaleId); err != nil {
-		return responses.InternalServerError(c, "Failed to recalculate total sale", err)
-	}
+	// Recalculate total and sync reports asynchronously
+	go func() {
+		// Update stock in Redis
+		cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
+		var prod models.Product
+		if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
+			tools.UpdateProductStockInRedisAsync(cacheKey, item.ProductId, prod.Stock)
+		}
 
-	// Sync laporan profit harian
-	var sale models.Sales
-	if err := db.First(&sale, "id = ?", item.SaleId).Error; err != nil {
-		return responses.InternalServerError(c, "Failed to fetch sale", err)
-	}
+		if err := reports.RecalculateTotalSale(db, item.SaleId); err != nil {
+			fmt.Printf("Failed to recalculate total sale asynchronously: %v\n", err)
+		}
 
-	_ = reports.SyncDailyProfitReport(db, branchID, userID, sale.SaleDate, sale.TotalSale, sale.ProfitEstimate, 0, 0)
+		// Sync laporan profit harian
+		var sale models.Sales
+		if err := db.First(&sale, "id = ?", item.SaleId).Error; err != nil {
+			fmt.Printf("Failed to fetch sale asynchronously: %v\n", err)
+			return
+		}
+
+		_ = reports.SyncDailyProfitReport(db, branchID, userID, sale.SaleDate, sale.TotalSale, sale.ProfitEstimate, 0, 0)
+	}()
 
 	return responses.JSONResponse(c, http.StatusOK, "Item added successfully", item)
 }
@@ -545,17 +571,38 @@ func UpdateSaleItem(c *framework.Ctx) error {
 		return responses.InternalServerError(c, "Failed to update sale item", err)
 	}
 
-	if err := reports.RecalculateTotalSale(db, existingItem.SaleId); err != nil {
-		return responses.InternalServerError(c, "Failed to recalculate total sale", err)
-	}
+	// Supporting operations asynchronously
+	go func() {
+		// Update stock in Redis for both old and new products
+		cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
 
-	// Sync laporan profit harian
-	var sale models.Sales
-	if err := db.First(&sale, "id = ?", existingItem.SaleId).Error; err != nil {
-		return responses.InternalServerError(c, "Failed to fetch sale", err)
-	}
+		// Update stock for new product
+		var newProd models.Product
+		if err := db.Select("stock").Where("id = ?", updatedData.ProductId).First(&newProd).Error; err == nil {
+			tools.UpdateProductStockInRedisAsync(cacheKey, updatedData.ProductId, newProd.Stock)
+		}
 
-	_ = reports.SyncDailyProfitReport(db, branchID, userID, sale.SaleDate, sale.TotalSale, sale.ProfitEstimate, 0, 0)
+		// Update stock for old product if different
+		if updatedData.ProductId != existingItem.ProductId {
+			var oldProd models.Product
+			if err := db.Select("stock").Where("id = ?", existingItem.ProductId).First(&oldProd).Error; err == nil {
+				tools.UpdateProductStockInRedisAsync(cacheKey, existingItem.ProductId, oldProd.Stock)
+			}
+		}
+
+		if err := reports.RecalculateTotalSale(db, existingItem.SaleId); err != nil {
+			fmt.Printf("Failed to recalculate total sale asynchronously: %v\n", err)
+		}
+
+		// Sync laporan profit harian
+		var sale models.Sales
+		if err := db.First(&sale, "id = ?", existingItem.SaleId).Error; err != nil {
+			fmt.Printf("Failed to fetch sale asynchronously: %v\n", err)
+			return
+		}
+
+		_ = reports.SyncDailyProfitReport(db, branchID, userID, sale.SaleDate, sale.TotalSale, sale.ProfitEstimate, 0, 0)
+	}()
 
 	return responses.JSONResponse(c, http.StatusOK, "Item updated successfully", existingItem)
 }
@@ -564,6 +611,8 @@ func UpdateSaleItem(c *framework.Ctx) error {
 func DeleteSaleItem(c *framework.Ctx) error {
 	db := config.DB
 	id := c.Param("id")
+	branchID, _ := middlewares.GetBranchID(c.Request)
+	userID, _ := middlewares.GetUserID(c.Request)
 
 	var item models.SaleItems
 	if err := db.First(&item, "id = ?", id).Error; err != nil {
@@ -580,10 +629,19 @@ func DeleteSaleItem(c *framework.Ctx) error {
 		return responses.InternalServerError(c, "Failed to delete sale item", err)
 	}
 
-	// Recalculate total
-	if err := reports.RecalculateTotalSale(db, item.SaleId); err != nil {
-		return responses.InternalServerError(c, "Failed to recalculate total sale", err)
-	}
+	// Supporting operations asynchronously
+	go func() {
+		// Update stock in Redis
+		cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
+		var prod models.Product
+		if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
+			tools.UpdateProductStockInRedisAsync(cacheKey, item.ProductId, prod.Stock)
+		}
+
+		if err := reports.RecalculateTotalSale(db, item.SaleId); err != nil {
+			fmt.Printf("Failed to recalculate total sale asynchronously: %v\n", err)
+		}
+	}()
 
 	return responses.JSONResponse(c, http.StatusOK, "Item deleted successfully", item)
 }

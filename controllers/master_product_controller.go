@@ -176,7 +176,7 @@ func CmbProdSale(c *framework.Ctx) error {
 
 	if search != "" {
 		search = strings.ToLower(search)
-		query = query.Where("LOWER(products.name) LIKE ? OR LOWER(products.description) LIKE ?", "%"+search+"%", "%"+search+"%")
+		query = query.Where("LOWER(products.name) LIKE ? OR LOWER(products.description) LIKE ? OR LOWER(products.id) LIKE ?", "%"+search+"%", "%"+search+"%", "%"+search+"%")
 	}
 
 	query = query.Order("products.name ASC")

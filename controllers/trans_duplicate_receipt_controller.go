@@ -431,7 +431,7 @@ func CreateDuplicateReceiptItem(c *framework.Ctx) error {
 			return responses.InternalServerError(c, "Failed to reduce product stock", err)
 		}
 
-		if err := reports.RecalculateTotalSale(db, item.DuplicateReceiptId); err != nil {
+		if err := reports.RecalculateTotalDuplicate(db, item.DuplicateReceiptId); err != nil {
 			return responses.InternalServerError(c, "Failed to recalculate total sale", err)
 		}
 

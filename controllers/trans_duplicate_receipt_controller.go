@@ -439,8 +439,12 @@ func DeleteDuplicateReceipt(c *framework.Ctx) error {
 		return responses.InternalServerError(c, "Failed to delete sale", err)
 	}
 
-	// Delete laporan profit harian
-	_ = reports.DeleteDailyProfitReport(db, id, "duplicate_receipt")
+	// Delete laporan profit harian asynchronously
+	go func() {
+		if err := reports.DeleteDailyProfitReport(db, id, "duplicate_receipt"); err != nil {
+			fmt.Printf("Failed to delete daily profit report asynchronously: %v\n", err)
+		}
+	}()
 
 	return responses.JSONResponse(c, http.StatusOK, "Duplicate receipt deleted successfully", duplicate_receipt)
 }
@@ -499,15 +503,12 @@ func CreateDuplicateReceiptItem(c *framework.Ctx) error {
 			}
 		}
 
-		if err := reports.RecalculateTotalDuplicate(db, item.DuplicateReceiptId); err != nil {
-			return responses.InternalServerError(c, "Failed to recalculate total sale", err)
-		}
-
-		// Sync laporan profit harian
-		var duplicateReceipt models.DuplicateReceipts
-		if err := db.First(&duplicateReceipt, "id = ?", item.DuplicateReceiptId).Error; err != nil {
-			return responses.InternalServerError(c, "Failed to fetch duplicate receipt", err)
-		}
+		// Recalculate total asynchronously
+		go func() {
+			if err := reports.RecalculateTotalDuplicate(db, item.DuplicateReceiptId); err != nil {
+				fmt.Printf("Failed to recalculate total duplicate asynchronously: %v\n", err)
+			}
+		}()
 
 		return responses.JSONResponse(c, http.StatusOK, "Item updated successfully", existing)
 
@@ -538,17 +539,23 @@ func CreateDuplicateReceiptItem(c *framework.Ctx) error {
 		}
 	}
 
-	if err := reports.RecalculateTotalDuplicate(db, item.DuplicateReceiptId); err != nil {
-		return responses.InternalServerError(c, "Failed to recalculate total sale", err)
-	}
+	// Recalculate total and sync reports asynchronously
+	go func() {
+		if err := reports.RecalculateTotalDuplicate(db, item.DuplicateReceiptId); err != nil {
+			fmt.Printf("Failed to recalculate total duplicate asynchronously: %v\n", err)
+		}
 
-	// Sync laporan profit harian
-	var duplicateReceipt models.DuplicateReceipts
-	if err := db.First(&duplicateReceipt, "id = ?", item.DuplicateReceiptId).Error; err != nil {
-		return responses.InternalServerError(c, "Failed to fetch duplicate receipt", err)
-	}
+		// Sync laporan profit harian
+		var duplicateReceipt models.DuplicateReceipts
+		if err := db.First(&duplicateReceipt, "id = ?", item.DuplicateReceiptId).Error; err != nil {
+			fmt.Printf("Failed to fetch duplicate receipt asynchronously: %v\n", err)
+			return
+		}
 
-	_ = reports.SyncDailyProfitReport(db, branchID, userID, duplicateReceipt.DuplicateReceiptDate, duplicateReceipt.TotalDuplicateReceipt, duplicateReceipt.ProfitEstimate, 0, 0)
+		if err := reports.SyncDailyProfitReport(db, branchID, userID, duplicateReceipt.DuplicateReceiptDate, duplicateReceipt.TotalDuplicateReceipt, duplicateReceipt.ProfitEstimate, 0, 0); err != nil {
+			fmt.Printf("Failed to sync daily profit report asynchronously: %v\n", err)
+		}
+	}()
 
 	return responses.JSONResponse(c, http.StatusOK, "Item added successfully", item)
 }
@@ -618,17 +625,23 @@ func UpdateDuplicateReceiptItem(c *framework.Ctx) error {
 		return responses.InternalServerError(c, "Failed to update sale item", err)
 	}
 
-	if err := reports.RecalculateTotalDuplicate(db, existingItem.DuplicateReceiptId); err != nil {
-		return responses.InternalServerError(c, "Failed to recalculate total sale", err)
-	}
+	// Recalculate total and sync reports asynchronously
+	go func() {
+		if err := reports.RecalculateTotalDuplicate(db, existingItem.DuplicateReceiptId); err != nil {
+			fmt.Printf("Failed to recalculate total duplicate asynchronously: %v\n", err)
+		}
 
-	// Sync laporan profit harian
-	var duplicateReceipt models.DuplicateReceipts
-	if err := db.First(&duplicateReceipt, "id = ?", existingItem.DuplicateReceiptId).Error; err != nil {
-		return responses.InternalServerError(c, "Failed to fetch duplicate receipt", err)
-	}
+		// Sync laporan profit harian
+		var duplicateReceipt models.DuplicateReceipts
+		if err := db.First(&duplicateReceipt, "id = ?", existingItem.DuplicateReceiptId).Error; err != nil {
+			fmt.Printf("Failed to fetch duplicate receipt asynchronously: %v\n", err)
+			return
+		}
 
-	_ = reports.SyncDailyProfitReport(db, branchID, userID, duplicateReceipt.DuplicateReceiptDate, duplicateReceipt.TotalDuplicateReceipt, duplicateReceipt.ProfitEstimate, 0, 0)
+		if err := reports.SyncDailyProfitReport(db, branchID, userID, duplicateReceipt.DuplicateReceiptDate, duplicateReceipt.TotalDuplicateReceipt, duplicateReceipt.ProfitEstimate, 0, 0); err != nil {
+			fmt.Printf("Failed to sync daily profit report asynchronously: %v\n", err)
+		}
+	}()
 
 	return responses.JSONResponse(c, http.StatusOK, "Item updated successfully", existingItem)
 }
@@ -665,10 +678,12 @@ func DeleteDuplicateReceiptItem(c *framework.Ctx) error {
 		return responses.InternalServerError(c, "Failed to delete sale item", err)
 	}
 
-	// Recalculate total
-	if err := reports.RecalculateTotalDuplicate(db, item.DuplicateReceiptId); err != nil {
-		return responses.InternalServerError(c, "Failed to recalculate total sale", err)
-	}
+	// Recalculate total asynchronously
+	go func() {
+		if err := reports.RecalculateTotalDuplicate(db, item.DuplicateReceiptId); err != nil {
+			fmt.Printf("Failed to recalculate total duplicate asynchronously: %v\n", err)
+		}
+	}()
 
 	return responses.JSONResponse(c, http.StatusOK, "Item deleted successfully", item)
 }

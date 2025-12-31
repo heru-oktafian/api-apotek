@@ -154,15 +154,15 @@ func GetAllProduct(c *framework.Ctx) error {
 
 }
 
-// SetTemporaryProductCache menyimpan daftar produk sementara ke Redis dengan branch_id sebagai pembeda
-func SetTemporaryProductCache(branchID string, products []models.ProdSaleCombo) error {
+// SetTemporaryProductCache menyimpan daftar produk sementara ke Redis dengan cacheKey sebagai pembeda
+func SetTemporaryProductCache(cacheKey string, products []models.ProdSaleCombo) error {
 	ctx := context.Background()
 	// Ping Redis to check connection
 	if _, err := config.RDB.Ping(ctx).Result(); err != nil {
 		fmt.Printf("Redis ping failed: %v\n", err)
 		return err
 	}
-	key := fmt.Sprintf("tmp:products:sale:%s", branchID)
+	key := fmt.Sprintf("tmp:products:sale:%s", cacheKey)
 	data, err := json.Marshal(products)
 	if err != nil {
 		return err

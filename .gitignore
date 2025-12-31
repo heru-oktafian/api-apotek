@@ -5,5 +5,4 @@
 *pro-retail
 *api-apotek
 *go.mod
-*.exe
 !.env_example

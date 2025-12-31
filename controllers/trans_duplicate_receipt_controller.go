@@ -21,20 +21,48 @@ import (
 	"gorm.io/gorm"
 )
 
-// UpdateProductStockInRedis updates the product stock in Redis cache with branch and user context
-func UpdateProductStockInRedis(branchID, userID, productID string, stock int) error {
+// UpdateProductStockInRedis updates the product stock in the temporary cache with branch and user context
+func UpdateProductStockInRedis(cacheKey, productID string, newStock int) error {
 	ctx := context.Background()
 	// Ping Redis to check connection
 	if _, err := config.RDB.Ping(ctx).Result(); err != nil {
 		fmt.Printf("Redis ping failed: %v\n", err)
 		return err
 	}
-	key := fmt.Sprintf("product:stock:%s:%s:%s", branchID, userID, productID)
-	err := config.RDB.Set(ctx, key, stock, 30*time.Minute).Err()
-	if err == nil {
-		fmt.Printf("Successfully updated product stock in Redis key: %s with stock: %d\n", key, stock)
+
+	// Ambil data cache produk
+	products, err := GetTemporaryProductCache(cacheKey)
+	if err != nil {
+		fmt.Printf("Failed to get product cache for cacheKey %s: %v\n", cacheKey, err)
+		return err
 	}
-	return err
+	if products == nil {
+		fmt.Printf("No product cache found for cacheKey %s\n", cacheKey)
+		return fmt.Errorf("no cache found")
+	}
+
+	// Cari dan update stock produk
+	found := false
+	for i := range products {
+		if products[i].ProductId == productID {
+			products[i].Stock = newStock
+			found = true
+			break
+		}
+	}
+	if !found {
+		fmt.Printf("Product %s not found in cache for cacheKey %s\n", productID, cacheKey)
+		return fmt.Errorf("product not found in cache")
+	}
+
+	// Simpan kembali ke Redis
+	if err := SetTemporaryProductCache(cacheKey, products); err != nil {
+		fmt.Printf("Failed to update product cache for cacheKey %s: %v\n", cacheKey, err)
+		return err
+	}
+
+	fmt.Printf("Successfully updated stock for product %s in cache key: tmp:products:sale:%s\n", productID, cacheKey)
+	return nil
 }
 
 // CreateDuplicateReceipt handles the creation of a new duplicate receipt record.
@@ -133,7 +161,8 @@ func CreateDuplicateReceipt(c *framework.Ctx) error {
 		}
 
 		// Update stock in Redis
-		if err := UpdateProductStockInRedis(branchID, userID, product.ID, newStock); err != nil {
+		cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
+		if err := UpdateProductStockInRedis(cacheKey, product.ID, newStock); err != nil {
 			fmt.Printf("Failed to update stock in Redis for product %s: %v\n", product.ID, err)
 		}
 
@@ -389,9 +418,10 @@ func DeleteDuplicateReceipt(c *framework.Ctx) error {
 		for _, item := range items {
 			_ = tools.SubtractProductStock(db, item.ProductId, item.Qty)
 			// Update stock in Redis
+			cacheKey := fmt.Sprintf("%s:%s", duplicate_receipt.BranchID, duplicate_receipt.UserID)
 			var prod models.Product
 			if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
-				if err := UpdateProductStockInRedis(duplicate_receipt.BranchID, duplicate_receipt.UserID, item.ProductId, prod.Stock); err != nil {
+				if err := UpdateProductStockInRedis(cacheKey, item.ProductId, prod.Stock); err != nil {
 					fmt.Printf("Failed to update stock in Redis for product %s: %v\n", item.ProductId, err)
 				}
 			}
@@ -461,9 +491,10 @@ func CreateDuplicateReceiptItem(c *framework.Ctx) error {
 		}
 
 		// Update stock in Redis
+		cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
 		var prod models.Product
 		if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
-			if err := UpdateProductStockInRedis(branchID, userID, item.ProductId, prod.Stock); err != nil {
+			if err := UpdateProductStockInRedis(cacheKey, item.ProductId, prod.Stock); err != nil {
 				fmt.Printf("Failed to update stock in Redis for product %s: %v\n", item.ProductId, err)
 			}
 		}
@@ -499,9 +530,10 @@ func CreateDuplicateReceiptItem(c *framework.Ctx) error {
 	}
 
 	// Update stock in Redis
+	cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
 	var prod models.Product
 	if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
-		if err := UpdateProductStockInRedis(branchID, userID, item.ProductId, prod.Stock); err != nil {
+		if err := UpdateProductStockInRedis(cacheKey, item.ProductId, prod.Stock); err != nil {
 			fmt.Printf("Failed to update stock in Redis for product %s: %v\n", item.ProductId, err)
 		}
 	}
@@ -549,9 +581,10 @@ func UpdateDuplicateReceiptItem(c *framework.Ctx) error {
 	}
 
 	// Update stock in Redis for old product
+	cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
 	var prod models.Product
 	if err := db.Select("stock").Where("id = ?", existingItem.ProductId).First(&prod).Error; err == nil {
-		if err := UpdateProductStockInRedis(branchID, userID, existingItem.ProductId, prod.Stock); err != nil {
+		if err := UpdateProductStockInRedis(cacheKey, existingItem.ProductId, prod.Stock); err != nil {
 			fmt.Printf("Failed to update stock in Redis for product %s: %v\n", existingItem.ProductId, err)
 		}
 	}
@@ -568,9 +601,10 @@ func UpdateDuplicateReceiptItem(c *framework.Ctx) error {
 	}
 
 	// Update stock in Redis for new product
-	if err := db.Select("stock").Where("id = ?", updatedData.ProductId).First(&prod).Error; err == nil {
-		if err := UpdateProductStockInRedis(branchID, userID, updatedData.ProductId, prod.Stock); err != nil {
-			fmt.Printf("Failed to update stock in Redis for product %s: %v\n", updatedData.ProductId, err)
+	var newProd models.Product
+	if stockErr := db.Select("stock").Where("id = ?", updatedData.ProductId).First(&newProd).Error; stockErr == nil {
+		if updateErr := UpdateProductStockInRedis(cacheKey, updatedData.ProductId, newProd.Stock); updateErr != nil {
+			fmt.Printf("Failed to update stock in Redis for product %s: %v\n", updatedData.ProductId, updateErr)
 		}
 	}
 
@@ -618,9 +652,10 @@ func DeleteDuplicateReceiptItem(c *framework.Ctx) error {
 	}
 
 	// Update stock in Redis
+	cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
 	var prod models.Product
 	if err := db.Select("stock").Where("id = ?", item.ProductId).First(&prod).Error; err == nil {
-		if err := UpdateProductStockInRedis(branchID, userID, item.ProductId, prod.Stock); err != nil {
+		if err := UpdateProductStockInRedis(cacheKey, item.ProductId, prod.Stock); err != nil {
 			fmt.Printf("Failed to update stock in Redis for product %s: %v\n", item.ProductId, err)
 		}
 	}

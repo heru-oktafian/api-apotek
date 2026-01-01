@@ -138,3 +138,13 @@ func RecalculateTotalOpname(db *gorm.DB, opnameID string) error {
 
 	return nil
 }
+
+// OpnameProductStockAsync set stok produk secara asynchronous
+func OpnameProductStockAsync(db *gorm.DB, productID string, qty int) {
+	go func() {
+		if err := OpnameProductStock(db, productID, qty); err != nil {
+			// Log error asynchronously
+			log.Printf("Failed to opname product stock asynchronously: %v", err)
+		}
+	}()
+}

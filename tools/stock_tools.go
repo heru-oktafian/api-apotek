@@ -2,6 +2,7 @@ package tools
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/heru-oktafian/api-apotek/models"
 	"github.com/heru-oktafian/api-apotek/reports"
@@ -119,4 +120,36 @@ func RecalculateTotalPurchase(db *gorm.DB, purchaseID string) error {
 	}
 
 	return nil
+}
+
+// Async versions for better performance
+
+// AddProductStockAsync menambah stok produk secara asynchronous
+func AddProductStockAsync(db *gorm.DB, productID string, qty int) {
+	go func() {
+		if err := AddProductStock(db, productID, qty); err != nil {
+			// Log error asynchronously
+			fmt.Printf("Failed to add product stock asynchronously: %v\n", err)
+		}
+	}()
+}
+
+// ReduceProductStockAsync mengurangi stok produk secara asynchronous
+func ReduceProductStockAsync(db *gorm.DB, productID string, qty int) {
+	go func() {
+		if err := ReduceProductStock(db, productID, qty); err != nil {
+			// Log error asynchronously
+			fmt.Printf("Failed to reduce product stock asynchronously: %v\n", err)
+		}
+	}()
+}
+
+// ZeroProductStockAsync mengosongkan stok produk secara asynchronous
+func ZeroProductStockAsync(db *gorm.DB, productID string, qty int) {
+	go func() {
+		if err := ZeroProductStock(db, productID, qty); err != nil {
+			// Log error asynchronously
+			fmt.Printf("Failed to zero product stock asynchronously: %v\n", err)
+		}
+	}()
 }

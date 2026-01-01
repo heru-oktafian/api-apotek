@@ -326,6 +326,10 @@ func DeleteOpnameByID(c *framework.Ctx) error {
 	db := config.DB
 	id := c.Param("id")
 
+	// Ambil branch ID dan user ID dari token
+	branchID, _ := middlewares.GetBranchID(c.Request)
+	userID, _ := middlewares.GetUserID(c.Request)
+
 	// Ambil opname
 	var opname models.Opnames
 	if err := db.First(&opname, "id = ?", id).Error; err != nil {
@@ -339,13 +343,11 @@ func DeleteOpnameByID(c *framework.Ctx) error {
 	}
 
 	for _, item := range items {
-		// Kosongkan stok ke produk
-		if err := tools.ZeroProductStock(db, item.ProductId, item.Qty); err != nil {
-			return responses.InternalServerError(c, "Gagal mengosongkan stok produk", err)
-		}
+		// Kosongkan stok ke produk asynchronously
+		tools.ZeroProductStockAsync(db, item.ProductId, item.Qty)
 	}
 
-	// Hapus semua item dari pembelian
+	// Hapus semua item dari opname
 	if err := db.Where("opname_id = ?", id).Delete(&models.OpnameItems{}).Error; err != nil {
 		return responses.InternalServerError(c, "Gagal menghapus item opname", err)
 	}
@@ -359,6 +361,10 @@ func DeleteOpnameByID(c *framework.Ctx) error {
 	if err := db.Delete(&opname).Error; err != nil {
 		return responses.InternalServerError(c, "Gagal menghapus opname", err)
 	}
+
+	// Invalidate cache opname products
+	cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
+	tools.DeleteTemporaryOpnameProductCache(cacheKey)
 
 	return responses.JSONResponse(c, http.StatusOK, "Opname berhasil dihapus", opname)
 }
@@ -414,6 +420,10 @@ func CreateOpnameItem(c *framework.Ctx) error {
 		return responses.BadRequest(c, "Masukan tidak valid: "+err.Error(), err)
 	}
 
+	// Ambil branch ID dan user ID dari token
+	branchID, _ := middlewares.GetBranchID(c.Request)
+	userID, _ := middlewares.GetUserID(c.Request)
+
 	// Ambil data produk untuk mendapatkan price, stock, dan purchase_price
 	var product models.Product
 	if err := db.Where("id = ?", input.ProductId).First(&product).Error; err != nil {
@@ -463,13 +473,16 @@ func CreateOpnameItem(c *framework.Ctx) error {
 			return responses.InternalServerError(c, "Gagal memperbarui item opname: "+err.Error(), err)
 		}
 
-		if err := tools.OpnameProductStock(db, opnameItem.ProductId, opnameItem.Qty); err != nil {
-			return responses.InternalServerError(c, "Gagal menyesuaikan stok produk saat pembaruan: "+err.Error(), err)
-		}
+		// Update stok asynchronously
+		tools.OpnameProductStockAsync(db, opnameItem.ProductId, opnameItem.Qty)
 
 		if err := tools.RecalculateTotalOpname(db, opnameItem.OpnameId); err != nil {
 			return responses.InternalServerError(c, "Gagal menghitung ulang total opname: "+err.Error(), err)
 		}
+
+		// Invalidate cache opname products
+		cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
+		tools.DeleteTemporaryOpnameProductCache(cacheKey)
 
 		return responses.JSONResponse(c, http.StatusOK, "Item opname berhasil diperbarui", existingItem)
 
@@ -485,13 +498,16 @@ func CreateOpnameItem(c *framework.Ctx) error {
 		return responses.InternalServerError(c, "Gagal menambahkan item opname: "+err.Error(), err)
 	}
 
-	if err := tools.OpnameProductStock(db, opnameItem.ProductId, opnameItem.Qty); err != nil {
-		return responses.InternalServerError(c, "Gagal menyesuaikan stok produk saat pembuatan: "+err.Error(), err)
-	}
+	// Update stok asynchronously
+	tools.OpnameProductStockAsync(db, opnameItem.ProductId, opnameItem.Qty)
 
 	if err := tools.RecalculateTotalOpname(db, opnameItem.OpnameId); err != nil {
 		return responses.InternalServerError(c, "Gagal menghitung ulang total opname: "+err.Error(), err)
 	}
+
+	// Invalidate cache opname products
+	cacheKey := fmt.Sprintf("%s:%s", branchID, userID)
+	tools.DeleteTemporaryOpnameProductCache(cacheKey)
 
 	return responses.JSONResponse(c, http.StatusOK, "Item opname berhasil disimpan", opnameItem)
 }
@@ -535,15 +551,11 @@ func UpdateOpnameItemByID(c *framework.Ctx) error {
 		return responses.JSONResponse(c, http.StatusBadRequest, "Masukan tidak valid", nil)
 	}
 
-	// Kosongkan stok lama
-	if err := tools.ZeroProductStock(db, existingItem.ProductId, existingItem.Qty); err != nil {
-		return responses.JSONResponse(c, http.StatusInternalServerError, "Gagal mengosongkan stok lama: "+err.Error(), err)
-	}
+	// Kosongkan stok lama asynchronously
+	tools.ZeroProductStockAsync(db, existingItem.ProductId, existingItem.Qty)
 
-	// Tambah stok baru
-	if err := tools.AddProductStock(db, updatedItem.ProductId, updatedItem.Qty); err != nil {
-		return responses.JSONResponse(c, http.StatusInternalServerError, "Gagal menambah stok baru: "+err.Error(), err)
-	}
+	// Tambah stok baru asynchronously
+	tools.AddProductStockAsync(db, updatedItem.ProductId, updatedItem.Qty)
 
 	// Update item
 	existingItem.ProductId = updatedItem.ProductId
@@ -591,6 +603,9 @@ func UpdateOpnameItemByID(c *framework.Ctx) error {
 		if err := tools.RecalculateTotalOpname(db, existingItem.OpnameId); err != nil {
 			fmt.Printf("Failed to recalculate total opname asynchronously: %v\n", err)
 		}
+
+		// Invalidate cache opname products
+		tools.DeleteTemporaryOpnameProductCache(cacheKey)
 	}()
 
 	return responses.JSONResponse(c, http.StatusOK, "Item berhasil diperbarui", existingItem)
@@ -606,10 +621,8 @@ func DeleteOpnameItemByID(c *framework.Ctx) error {
 		return responses.JSONResponse(c, http.StatusNotFound, "Item tidak ditemukan", err)
 	}
 
-	// Subtract stok
-	if err := tools.ReduceProductStock(db, item.ProductId, item.Qty); err != nil {
-		return responses.JSONResponse(c, http.StatusInternalServerError, "Gagal mengurangi stok produk: "+err.Error(), err)
-	}
+	// Subtract stok asynchronously
+	tools.ReduceProductStockAsync(db, item.ProductId, item.Qty)
 
 	// Hapus item
 	if err := db.Delete(&item).Error; err != nil {
@@ -630,6 +643,9 @@ func DeleteOpnameItemByID(c *framework.Ctx) error {
 		if err := tools.RecalculateTotalOpname(db, item.OpnameId); err != nil {
 			fmt.Printf("Failed to recalculate total opname asynchronously: %v\n", err)
 		}
+
+		// Invalidate cache opname products
+		tools.DeleteTemporaryOpnameProductCache(cacheKey)
 	}()
 
 	return responses.JSONResponse(c, http.StatusOK, "Item berhasil dihapus", item)
@@ -637,30 +653,52 @@ func DeleteOpnameItemByID(c *framework.Ctx) error {
 
 // GetBuyProductsCombobox dengan pencarian berdasarkan body
 func GetProductsComboboxByName(c *framework.Ctx) error {
-	// Ambil branch ID dari token
+	// Ambil branch ID dan user ID dari token
 	branch_id, _ := middlewares.GetBranchID(c.Request)
+	user_id, _ := middlewares.GetUserID(c.Request)
 
 	// Bersihkan dan ubah ke lowercase
-	search := strings.TrimSpace(c.Query("search"))
+	search := strings.TrimSpace(strings.ToLower(c.Query("search")))
 
-	// Inisialisasi response
-	var prodCombo []models.ComboboxProducts
+	// Buat cache key
+	cacheKey := fmt.Sprintf("%s:%s", branch_id, user_id)
 
-	// Query dasar
-	query := config.DB.Table("products pro").
-		Select("pro.id AS pro_id, pro.name AS pro_name, pro.unit_id, pro.stock, unt.name AS unit_name, pro.purchase_price AS price").
-		Joins("LEFT JOIN units unt ON unt.id = pro.unit_id").
-		Where("pro.branch_id = ?", branch_id).
-		Order("pro.name ASC")
-
-	// Tambahkan filter jika ada search
-	if search != "" {
-		query = query.Where("LOWER(pro.name) LIKE ? OR LOWER(pro.description) LIKE ?", "%"+search+"%", "%"+search+"%")
+	// Coba ambil dari cache Redis
+	prodCombo, err := tools.GetTemporaryOpnameProductCache(cacheKey)
+	if err != nil {
+		return responses.JSONResponse(c, http.StatusInternalServerError, "Gagal mengambil cache", err)
 	}
 
-	// Eksekusi query
-	if err := query.Find(&prodCombo).Error; err != nil {
-		return responses.JSONResponse(c, http.StatusNotFound, "Combobox tidak ditemukan", err)
+	// Jika tidak ada di cache, ambil dari database
+	if prodCombo == nil {
+		// Query dasar tanpa filter search
+		query := config.DB.Table("products pro").
+			Select("pro.id AS pro_id, pro.name AS pro_name, pro.unit_id, pro.stock, unt.name AS unit_name, pro.purchase_price AS price").
+			Joins("LEFT JOIN units unt ON unt.id = pro.unit_id").
+			Where("pro.branch_id = ?", branch_id).
+			Order("pro.name ASC")
+
+		// Eksekusi query
+		if err := query.Find(&prodCombo).Error; err != nil {
+			return responses.JSONResponse(c, http.StatusNotFound, "Combobox tidak ditemukan", err)
+		}
+
+		// Simpan ke cache Redis
+		if err := tools.SetTemporaryOpnameProductCache(cacheKey, prodCombo); err != nil {
+			// Log error tapi jangan gagal request
+			fmt.Printf("Failed to save opname product cache: %v\n", err)
+		}
+	}
+
+	// Filter berdasarkan search jika ada
+	if search != "" {
+		var filtered []models.ComboboxProducts
+		for _, prod := range prodCombo {
+			if strings.Contains(strings.ToLower(prod.ProName), search) || strings.Contains(strings.ToLower(prod.ProName), search) { // Asumsi description tidak ada, atau tambahkan jika perlu
+				filtered = append(filtered, prod)
+			}
+		}
+		prodCombo = filtered
 	}
 
 	return responses.JSONResponse(c, http.StatusOK, "Data Combobox ditemukan", prodCombo)

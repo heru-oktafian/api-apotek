@@ -144,3 +144,49 @@ func DeleteTemporaryPurchaseProductCache(cacheKey string) error {
 	key := fmt.Sprintf("tmp:products:purchase:%s", cacheKey)
 	return config.RDB.Del(ctx, key).Err()
 }
+
+// SetTemporaryOpnameProductCache menyimpan daftar produk opname sementara ke Redis dengan cacheKey sebagai pembeda
+func SetTemporaryOpnameProductCache(cacheKey string, products []models.ComboboxProducts) error {
+	ctx := context.Background()
+	// Ping Redis to check connection
+	if _, err := config.RDB.Ping(ctx).Result(); err != nil {
+		fmt.Printf("Redis ping failed: %v\n", err)
+		return err
+	}
+	key := fmt.Sprintf("tmp:products:opname:%s", cacheKey)
+	data, err := json.Marshal(products)
+	if err != nil {
+		return err
+	}
+	// Set dengan TTL 30 menit
+	err = config.RDB.Set(ctx, key, data, 30*time.Minute).Err()
+	if err == nil {
+		fmt.Printf("Successfully saved opname product cache to Redis key: %s\n", key)
+	}
+	return err
+}
+
+// GetTemporaryOpnameProductCache mengambil daftar produk opname sementara dari Redis berdasarkan cacheKey
+func GetTemporaryOpnameProductCache(cacheKey string) ([]models.ComboboxProducts, error) {
+	ctx := context.Background()
+	key := fmt.Sprintf("tmp:products:opname:%s", cacheKey)
+	val, err := config.RDB.Get(ctx, key).Result()
+	if err == redis.Nil {
+		return nil, nil // Tidak ada data cache
+	}
+	if err != nil {
+		return nil, err
+	}
+	var products []models.ComboboxProducts
+	if err := json.Unmarshal([]byte(val), &products); err != nil {
+		return nil, err
+	}
+	return products, nil
+}
+
+// DeleteTemporaryOpnameProductCache menghapus cache produk opname sementara dari Redis berdasarkan cacheKey
+func DeleteTemporaryOpnameProductCache(cacheKey string) error {
+	ctx := context.Background()
+	key := fmt.Sprintf("tmp:products:opname:%s", cacheKey)
+	return config.RDB.Del(ctx, key).Err()
+}

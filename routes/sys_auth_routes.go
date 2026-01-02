@@ -15,7 +15,6 @@ func SysAuthRoutes(app *framework.Fiber) {
 
 	// Group routes under /api
 	auth := app.Group("/api")
-	auth.Use(middlewares.CORS())
 
 	// auth.Post("/register", controllers.RegisterUser)
 	auth.Post("/login", controllers.LoginUser)

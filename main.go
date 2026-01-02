@@ -5,7 +5,6 @@ import (
 	os "os"
 	"strconv"
 
-	// "github.com/gofiber/fiber/v2"
 	models "github.com/heru-oktafian/api-apotek/models"
 	routes "github.com/heru-oktafian/api-apotek/routes"
 	scheduler "github.com/heru-oktafian/api-apotek/scheduler"
@@ -13,9 +12,27 @@ import (
 	env "github.com/heru-oktafian/scafold/env"
 	framework "github.com/heru-oktafian/scafold/framework"
 
-	// middlewares "github.com/heru-oktafian/scafold/middlewares"
 	utils "github.com/heru-oktafian/scafold/utils"
 )
+
+// CORS middleware function compatible with scafold framework
+func CORS() framework.MiddlewareFunc {
+	return func(c *framework.Ctx, next framework.NextFunc) {
+		// Set CORS headers
+		c.Response.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Response.Header().Set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
+		c.Response.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization")
+
+		// Handle preflight OPTIONS request
+		if c.Request.Method == "OPTIONS" {
+			c.Response.WriteHeader(200)
+			return
+		}
+
+		// Proceed to next middleware/handler
+		next()
+	}
+}
 
 func main() {
 	// Initialize timezone
@@ -97,7 +114,7 @@ func main() {
 	// Start the application
 	app := framework.New()
 	// Global Middleware
-	// app.Use(middlewares.CORS()(c))
+	app.Use(CORS())
 
 	// Routes
 	routes.SysAuthRoutes(app)

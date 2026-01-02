@@ -5,13 +5,15 @@ import (
 	os "os"
 	"strconv"
 
+	// "github.com/gofiber/fiber/v2"
 	models "github.com/heru-oktafian/api-apotek/models"
 	routes "github.com/heru-oktafian/api-apotek/routes"
 	scheduler "github.com/heru-oktafian/api-apotek/scheduler"
 	config "github.com/heru-oktafian/scafold/config"
 	env "github.com/heru-oktafian/scafold/env"
 	framework "github.com/heru-oktafian/scafold/framework"
-	middlewares "github.com/heru-oktafian/scafold/middlewares"
+
+	// middlewares "github.com/heru-oktafian/scafold/middlewares"
 	utils "github.com/heru-oktafian/scafold/utils"
 )
 
@@ -94,9 +96,8 @@ func main() {
 
 	// Start the application
 	app := framework.New()
-
-	app.Use(middlewares.CORS())
-	// app.Use(middlewares.Logger())
+	// Global Middleware
+	// app.Use(middlewares.CORS()(c))
 
 	// Routes
 	routes.SysAuthRoutes(app)

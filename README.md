@@ -1,4 +1,4 @@
-# Vimedika - Apotek 🚀
+# Cores 🚀
 
 [![Golang](https://img.shields.io/badge/Golang-1.25%2B-blue.svg)](https://golang.org/)
 [![Postgres](https://img.shields.io/badge/PostgreSQL-17.4-yellow)](https://www.postgresql.org/)
@@ -54,7 +54,7 @@ Pastikan Anda telah menginstal yang berikut ini:
 
 1.  **Clone** repositori ini:
     ```bash
-     git clone git@github.com:heru-oktafian/api-apotek.git
+     git clone git@github.com:heru-oktafian/cores.git
      cd api-apotek
     ```
 

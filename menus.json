@@ -111,6 +111,18 @@
                 },
                 {
                     "group_menu": "Transaksi",
+                    "title":"Kopi Resep",
+                    "url":"/api/duplicate-receipts",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
                     "title":"Retur Penjualan",
                     "url":"/api/sale-returns",
                     "access":[
@@ -362,6 +374,18 @@
                     "group_menu": "Transaksi",
                     "title":"Penjualan",
                     "url":"/api/sales",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
+                    "title":"Kopi Resep",
+                    "url":"/api/duplicate-receipts",
                     "access":[
                         "create",
                         "update",
@@ -633,6 +657,18 @@
                 },
                 {
                     "group_menu": "Transaksi",
+                    "title":"Kopi Resep",
+                    "url":"/api/duplicate-receipts",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
                     "title":"Retur Penjualan",
                     "url":"/api/sale-returns",
                     "access":[
@@ -822,6 +858,18 @@
                 },
                 {
                     "group_menu": "Transaksi",
+                    "title":"Kopi Resep",
+                    "url":"/api/duplicate-receipts",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
                     "title":"Retur Penjualan",
                     "url":"/api/sale-returns",
                     "access":[
@@ -975,6 +1023,18 @@
                 },
                 {
                     "group_menu": "Transaksi",
+                    "title":"Kopi Resep",
+                    "url":"/api/duplicate-receipts",
+                    "access":[
+                        "create",
+                        "update",
+                        "delete",
+                        "get_by_id",
+                        "get_all"
+                    ]
+                },
+                {
+                    "group_menu": "Transaksi",
                     "title":"Retur Penjualan",
                     "url":"/api/sale-returns",
                     "access":[
@@ -996,7 +1056,7 @@
                         "get_by_id",
                         "get_all"
                     ]
-                },
+                },                
                 {
                     "group_menu": "Transaksi",
                     "title":"Retur Pembelian",

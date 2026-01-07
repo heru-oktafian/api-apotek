@@ -10,7 +10,7 @@ type DuplicateReceipts struct {
 	DuplicateReceiptDate  time.Time     `json:"duplicate_receipt_date" gorm:"not null"`
 	TotalDuplicateReceipt int           `json:"total_duplicate_receipt" gorm:"not null" type:"int"`
 	ProfitEstimate        int           `json:"profit_estimate" gorm:"not null" type:"int"`
-	Payment               PaymentStatus `json:"payment" gorm:"type:payment_status; default: 'unpaid';not null" validate:"required"`
+	Payment               PaymentStatus `json:"payment" gorm:"type:payment_status; default: 'paid_by_cash';not null" validate:"required"`
 	BranchID              string        `json:"branch_id" gorm:"type:varchar(15);not null"`
 	UserID                string        `json:"user_id" gorm:"type:varchar(15);not null"`
 	CreatedAt             time.Time     `json:"created_at" gorm:"autoCreateTime"`
@@ -26,13 +26,15 @@ type AllDuplicateReceipts struct {
 	DuplicateReceiptDate  time.Time     `json:"duplicate_receipt_date" gorm:"not null"`
 	TotalDuplicateReceipt int           `json:"total_duplicate_receipt" gorm:"not null" validate:"required" type:"int"`
 	ProfitEstimate        int           `json:"profit_estimate" gorm:"not null" validate:"required" type:"int"`
-	Payment               PaymentStatus `gorm:"type:payment_status;not null;default:'unpaid'" json:"payment" validate:"required"`
+	Payment               PaymentStatus `gorm:"type:payment_status;not null;default:'paid_by_cash'" json:"payment" validate:"required"`
 }
 
-// DuplicateReceipeInput model for input data
+// DuplicateReceiptInput model for input data
 type DuplicateReceiptInput struct {
-	DuplicateReceipeDate string  `json:"duplicate_receipt_date" validate:"required"`
-	MemberId             *string `json:"member_id"`
-	Discount             *int    `json:"discount"`
-	Payment              string  `json:"payment"`
+	MemberId              string        `gorm:"type:varchar(15);not null" json:"member_id"`
+	Description           string        `json:"description" gorm:"type:text"`
+	DuplicateReceiptDate  string        `json:"duplicate_receipt_date" validate:"required"`
+	TotalDuplicateReceipt int           `json:"total_duplicate_receipt" gorm:"not null" type:"int"`
+	ProfitEstimate        int           `json:"profit_estimate" gorm:"not null" type:"int"`
+	Payment               PaymentStatus `json:"payment" gorm:"type:payment_status; default: 'paid_by_cash';not null" validate:"required"`
 }

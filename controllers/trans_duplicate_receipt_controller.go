@@ -38,22 +38,13 @@ func CreateDuplicateReceipt(c *framework.Ctx) error {
 	defaultMember, _ := middlewares.GetClaimsToken(c.Request, "default_member")
 
 	//--- VALIDASI INPUT ---
-
 	subscriptionType, _ := middlewares.GetClaimsToken(c.Request, "subscription_type")
-
 	branchID, _ := middlewares.GetBranchID(c.Request)
-
 	userID, _ := middlewares.GetUserID(c.Request)
 
 	err = utils.ValidateStruct(req)
 	if err != nil {
 		return responses.BadRequest(c, "Validate failed", err)
-	}
-	// --- AKHIR VALIDASI INPUT ---
-	// Modifikasi agar jika `member_id` tidak dikirim dalam request,
-	// maka `member_id` diisi `defaultMember` dari deklarasi tersebut.
-	if req.DuplicateReceipt.MemberId == "" {
-		req.DuplicateReceipt.MemberId = defaultMember
 	}
 
 	if req.DuplicateReceipt.Payment == "" {
@@ -72,14 +63,15 @@ func CreateDuplicateReceipt(c *framework.Ctx) error {
 		}
 	}()
 
-	// 1. Simpan data Sales (induk)
+	// Parse tanggal
+	layout := "2006-01-02" // format harus YYYY-MM-DD
+	parsedDate, err := time.Parse(layout, req.DuplicateReceipt.DuplicateReceiptDate)
+	if err != nil {
+		return responses.BadRequest(c, "Invalid date format. Use YYYY-MM-DD", nil)
+	}
+
+	// 1. Simpan data Duplicate Receipt (induk)
 	durID := helpers.GenerateID("DUR")
-	req.DuplicateReceipt.ID = durID
-	req.DuplicateReceipt.DuplicateReceiptDate = nowWIB
-	req.DuplicateReceipt.UserID = userID
-	req.DuplicateReceipt.BranchID = branchID
-	req.DuplicateReceipt.CreatedAt = nowWIB
-	req.DuplicateReceipt.UpdatedAt = nowWIB
 
 	// Inisilisasi total & profit duplicate receipt
 	totalDUR := 0
@@ -130,7 +122,21 @@ func CreateDuplicateReceipt(c *framework.Ctx) error {
 	req.DuplicateReceipt.TotalDuplicateReceipt = totalDUR
 	req.DuplicateReceipt.ProfitEstimate = totalProfDUR
 
-	err = tx.Create(&req.DuplicateReceipt).Error
+	insertDuplicateReceipt := models.DuplicateReceipts{
+		ID:                    durID,
+		MemberId:              defaultMember,
+		Description:           req.DuplicateReceipt.Description,
+		DuplicateReceiptDate:  parsedDate,
+		TotalDuplicateReceipt: req.DuplicateReceipt.TotalDuplicateReceipt,
+		ProfitEstimate:        req.DuplicateReceipt.ProfitEstimate,
+		Payment:               req.DuplicateReceipt.Payment,
+		BranchID:              branchID,
+		UserID:                userID,
+		CreatedAt:             nowWIB,
+		UpdatedAt:             nowWIB,
+	}
+
+	err = tx.Create(&insertDuplicateReceipt).Error
 	if err != nil {
 		tx.Rollback()
 		return responses.InternalServerError(c, "Failed to create duplicate receipt", err)
@@ -146,8 +152,8 @@ func CreateDuplicateReceipt(c *framework.Ctx) error {
 	transactionReport := models.TransactionReports{
 		ID:              transactionReportID,
 		TransactionType: models.Sale, // Tipe transaksi adalah "sale"
-		UserID:          req.DuplicateReceipt.UserID,
-		BranchID:        req.DuplicateReceipt.BranchID,
+		UserID:          userID,
+		BranchID:        branchID,
 		Total:           req.DuplicateReceipt.TotalDuplicateReceipt,
 		Payment:         req.DuplicateReceipt.Payment,
 		CreatedAt:       nowWIB,
@@ -163,13 +169,7 @@ func CreateDuplicateReceipt(c *framework.Ctx) error {
 	// Inisialisasi laporan duplicate receipt
 	var dailyProfit models.DailyProfitReport
 
-	// Pastikan Duplicate date tidak nol saat diakses (validasi required sudah ada, tapi jaga-jaga)
-	if req.DuplicateReceipt.DuplicateReceiptDate.IsZero() {
-		tx.Rollback()
-		return responses.BadRequest(c, "Date cannot be zero for daily profit report calculation. Please provide a valid date.", nil)
-	}
-
-	reportDate := req.DuplicateReceipt.DuplicateReceiptDate.Format("2006-01-02") // Format tanggal menjadi "YYYY-MM-DD"
+	reportDate := parsedDate.Format("2006-01-02") // Format tanggal menjadi "YYYY-MM-DD"
 	err = tx.Where("report_date = ? AND branch_id = ? AND user_id = ?", reportDate, branchID, userID).First(&dailyProfit).Error
 
 	// Cek error selain record not found
@@ -183,7 +183,7 @@ func CreateDuplicateReceipt(c *framework.Ctx) error {
 		dailyProfitID := helpers.GenerateID("DPR")
 		dailyProfit = models.DailyProfitReport{
 			ID:             dailyProfitID,
-			ReportDate:     req.DuplicateReceipt.DuplicateReceiptDate,
+			ReportDate:     parsedDate,
 			UserID:         userID,
 			BranchID:       branchID,
 			TotalSales:     req.DuplicateReceipt.TotalDuplicateReceipt,
@@ -210,11 +210,11 @@ func CreateDuplicateReceipt(c *framework.Ctx) error {
 
 	if subscriptionType == "quota" {
 		var branch models.Branch
-		err = tx.Where("id = ?", req.DuplicateReceipt.BranchID).First(&branch).Error
+		err = tx.Where("id = ?", branchID).First(&branch).Error
 		if err != nil {
 			tx.Rollback()
 			if err == gorm.ErrRecordNotFound {
-				return responses.NotFound(c, fmt.Sprintf("Branch with ID %s not found", req.DuplicateReceipt.BranchID))
+				return responses.NotFound(c, fmt.Sprintf("Branch with ID %s not found", branchID))
 			}
 			return responses.InternalServerError(c, "Failed to retrieve branch details for quota update", err)
 		}
@@ -287,7 +287,8 @@ func UpdateDuplicateReceipt(c *framework.Ctx) error {
 	nowWIB := time.Now().In(utils.Location)
 
 	branchID, _ := middlewares.GetBranchID(c.Request)
-	userID, _ := middlewares.GetUserID(c.Request)
+	userID, _ := middlewares.GetUserID(c.Request) // Get default_member id dari token
+	defaultMember, _ := middlewares.GetClaimsToken(c.Request, "default_member")
 
 	total_before := 0
 	profit_before := 0
@@ -308,17 +309,17 @@ func UpdateDuplicateReceipt(c *framework.Ctx) error {
 		return responses.BadRequest(c, "Invalid input", err)
 	}
 
-	if input.MemberId != nil {
+	if input.MemberId != "" {
 		var member models.Member
-		if err := db.Where("id = ?", *input.MemberId).First(&member).Error; err != nil {
+		if err := db.Where("id = ?", input.MemberId).First(&member).Error; err != nil {
 			// Jika ID tidak valid, fallback ke default
 			memberId, _ := middlewares.GetClaimsToken(c.Request, "default_member")
 			duplicate_receipt.MemberId = memberId
 		} else {
-			duplicate_receipt.MemberId = *input.MemberId
+			duplicate_receipt.MemberId = defaultMember
 		}
 	}
-	// Jika nil → tidak diubah, tetap pakai MemberID yang sudah ada
+	// Jika kosong → tidak diubah, tetap pakai MemberID yang sudah ada
 
 	if input.Payment != "" {
 		duplicate_receipt.Payment = models.PaymentStatus(input.Payment)
@@ -407,7 +408,7 @@ func DeleteDuplicateReceipt(c *framework.Ctx) error {
 }
 
 type DuplicateReceiptRequest struct {
-	DuplicateReceipt models.DuplicateReceipts       `json:"duplicate_receipt"`
+	DuplicateReceipt models.DuplicateReceiptInput   `json:"duplicate_receipt"`
 	Items            []models.DuplicateReceiptItems `json:"items"`
 }
 
@@ -756,8 +757,8 @@ func GetAllDuplicateDetail(c *framework.Ctx) error {
 	type duplicateSummary struct {
 		ID                    string
 		TotalDuplicateReceipt int
+		DuplicateReceiptDate  time.Time
 		Payment               string
-		SaleDate              time.Time
 	}
 
 	var salesFromDB []duplicateSummary
@@ -808,7 +809,7 @@ func GetAllDuplicateDetail(c *framework.Ctx) error {
 
 		// Gabungkan nama item, lalu tambahkan tanggal yang ditambah 7 jam
 		descItems := strings.Join(itemNames, ", ")
-		dateWith7 := s.SaleDate.Add(7 * time.Hour).Format("02-01-2006 15:04")
+		dateWith7 := s.DuplicateReceiptDate.Add(7 * time.Hour).Format("02-01-2006 15:04")
 		var description string
 		if descItems != "" {
 			description = descItems + " ; " + dateWith7
@@ -818,9 +819,10 @@ func GetAllDuplicateDetail(c *framework.Ctx) error {
 
 		formatted = append(formatted, map[string]interface{}{
 			"id":                      s.ID,
-			"total_duplicate_receipt": s.TotalDuplicateReceipt,
-			"payment":                 s.Payment,
+			"duplicate_receipt_date":  utils.FormatIndonesianDate(s.DuplicateReceiptDate),
 			"description":             description,
+			"payment":                 s.Payment,
+			"total_duplicate_receipt": s.TotalDuplicateReceipt,
 		})
 	}
 

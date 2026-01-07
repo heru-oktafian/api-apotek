@@ -757,6 +757,7 @@ func GetAllDuplicateDetail(c *framework.Ctx) error {
 	type duplicateSummary struct {
 		ID                    string
 		TotalDuplicateReceipt int
+		Description           string
 		DuplicateReceiptDate  time.Time
 		Payment               string
 	}
@@ -765,7 +766,7 @@ func GetAllDuplicateDetail(c *framework.Ctx) error {
 	var total int64
 
 	query := config.DB.Table("duplicate_receipts dr").
-		Select("dr.id, dr.total_duplicate_receipt, dr.payment, dr.duplicate_receipt_date").
+		Select("dr.id, dr.total_duplicate_receipt, dr.payment, dr.duplicate_receipt_date, dr.description").
 		Joins("LEFT JOIN members mbr on mbr.id = dr.member_id").
 		Where("dr.branch_id = ? AND dr.total_duplicate_receipt > 0", branchID).
 		Order("dr.created_at DESC")
@@ -812,9 +813,9 @@ func GetAllDuplicateDetail(c *framework.Ctx) error {
 		dateWith7 := s.DuplicateReceiptDate.Add(7 * time.Hour).Format("02-01-2006 15:04")
 		var description string
 		if descItems != "" {
-			description = descItems + " ; " + dateWith7
+			description = s.Description + " ; " + descItems + " ; " + dateWith7
 		} else {
-			description = dateWith7
+			description = s.Description + " ; " + dateWith7
 		}
 
 		formatted = append(formatted, map[string]interface{}{

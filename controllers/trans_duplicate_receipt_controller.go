@@ -760,13 +760,14 @@ func GetAllDuplicateDetail(c *framework.Ctx) error {
 		Description           string
 		DuplicateReceiptDate  time.Time
 		Payment               string
+		UpdatedAt             time.Time
 	}
 
 	var salesFromDB []duplicateSummary
 	var total int64
 
 	query := config.DB.Table("duplicate_receipts dr").
-		Select("dr.id, dr.total_duplicate_receipt, dr.payment, dr.duplicate_receipt_date, dr.description").
+		Select("dr.id, dr.total_duplicate_receipt, dr.payment, dr.duplicate_receipt_date, dr.description, dr.updated_at").
 		Joins("LEFT JOIN members mbr on mbr.id = dr.member_id").
 		Where("dr.branch_id = ? AND dr.total_duplicate_receipt > 0", branchID).
 		Order("dr.created_at DESC")
@@ -810,7 +811,7 @@ func GetAllDuplicateDetail(c *framework.Ctx) error {
 
 		// Gabungkan nama item, lalu tambahkan tanggal yang ditambah 7 jam
 		descItems := strings.Join(itemNames, ", ")
-		dateWith7 := s.DuplicateReceiptDate.Add(7 * time.Hour).Format("02-01-2006 15:04")
+		dateWith7 := s.UpdatedAt.Add(7 * time.Hour).Format("02-01-2006 15:04")
 		var description string
 		if descItems != "" {
 			description = s.Description + " ; " + descItems + " ; " + dateWith7

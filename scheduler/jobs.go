@@ -108,10 +108,48 @@ func AssetCounter(db *gorm.DB) error {
 		credit := creditMap[asset.BranchID]
 		finalAsset := asset.TotalAsset - credit
 
+		// Hitung statistik bulan ini untuk branch ini: jumlah hari tersimpan dan jumlah asset_value
+		now := time.Now()
+		monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+		monthEnd := monthStart.AddDate(0, 1, 0)
+
+		type BranchMonthStats struct {
+			QtyDays      int
+			SumAssetDays int
+		}
+
+		var stats BranchMonthStats
+		statsQuery := `
+			SELECT
+				COALESCE(COUNT(*), 0) as qty_days,
+				COALESCE(SUM(asset_value), 0) as sum_asset_days
+			FROM
+				daily_assets
+			WHERE
+				branch_id = ? AND asset_date >= ? AND asset_date < ?
+		`
+
+		if err := db.Raw(statsQuery, asset.BranchID, monthStart, monthEnd).Scan(&stats).Error; err != nil {
+			log.Printf("[ASSET COUNTER] Error querying monthly stats for branch %s: %v", asset.BranchID, err)
+			return err
+		}
+
+		vQtyDays := stats.QtyDays
+		vSumAssetDays := stats.SumAssetDays
+
+		var assetAverage int
+		if vQtyDays > 0 {
+			assetAverage = vSumAssetDays / vQtyDays
+		} else {
+			assetAverage = 0
+		}
+
 		dailyAsset := models.DailyAsset{
-			ID:         helpers.GenerateID("AST"),
-			AssetValue: finalAsset,
-			BranchId:   asset.BranchID,
+			ID:           helpers.GenerateID("AST"),
+			AssetDate:    time.Now(),
+			AssetValue:   finalAsset,
+			AssetAverage: assetAverage,
+			BranchId:     asset.BranchID,
 		}
 
 		if err := db.Create(&dailyAsset).Error; err != nil {

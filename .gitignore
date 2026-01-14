@@ -3,7 +3,7 @@
 *.log
 *.toml
 *pro-retail
-*api-apotek
+*aptdev
 *go.mod
 *.exe
 !.env_example

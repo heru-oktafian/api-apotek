@@ -21,24 +21,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// IsPurchaseEditable Function is using to check if the purchase is editable
-func IsPurchaseEditable(db *gorm.DB, purchaseID string) (bool, error) {
-	var createdAt time.Time
-	err := db.Table("purchases").
-		Select("created_at").
-		Where("id = ?", purchaseID).
-		Scan(&createdAt).Error
-	if err != nil {
-		return false, err
-	}
-
-	if time.Since(createdAt) >= time.Hour {
-		return false, nil
-	}
-
-	return true, nil
-}
-
 // CreatePurchase Function is using to create new purchase
 func CreatePurchase(c *framework.Ctx) error {
 
@@ -108,7 +90,7 @@ func UpdatePurchase(c *framework.Ctx) error {
 	}
 
 	// 🔁 Panggil reusable function untuk validasi 1 jam
-	editable, err := IsPurchaseEditable(db, purchase.ID)
+	editable, err := tools.IsEditable(db, "purchases", purchase.ID, 1*time.Hour)
 	if err != nil {
 		return responses.InternalServerError(c, "Failed to retrieve purchase timestamp", err)
 	}
@@ -187,7 +169,7 @@ func DeletePurchase(c *framework.Ctx) error {
 	}
 
 	// 🔁 Panggil reusable function untuk validasi 1 jam
-	editable, err := IsPurchaseEditable(db, purchase.ID)
+	editable, err := tools.IsEditable(db, "purchases", purchase.ID, 1*time.Hour)
 	if err != nil {
 		return responses.InternalServerError(c, "Failed to retrieve purchase timestamp", err)
 	}
@@ -236,7 +218,7 @@ func CreatePurchaseItem(c *framework.Ctx) error {
 	}
 
 	// 🔁 Panggil reusable function untuk validasi 1 jam
-	editable, errr := IsPurchaseEditable(db, item.PurchaseId)
+	editable, errr := tools.IsEditable(db, "purchases", item.PurchaseId, 1*time.Hour)
 	if errr != nil {
 		return responses.InternalServerError(c, "Failed to retrieve purchase timestamp", errr)
 	}
@@ -341,7 +323,7 @@ func UpdatePurchaseItem(c *framework.Ctx) error {
 	}
 
 	// 🔁 Panggil reusable function untuk validasi 1 jam
-	editable, errr := IsPurchaseEditable(db, existingItem.PurchaseId)
+	editable, errr := tools.IsEditable(db, "purchases", existingItem.PurchaseId, 1*time.Hour)
 	if errr != nil {
 		// return c.Status(500).JSON(fiber.Map{"error": "Failed to retrieve purchase timestamp"})
 		return responses.InternalServerError(c, "Failed to retrieve purchase timestamp", errr)
@@ -420,7 +402,7 @@ func DeletePurchaseItem(c *framework.Ctx) error {
 	}
 
 	// 🔁 Panggil reusable function untuk validasi 1 jam
-	editable, errr := IsPurchaseEditable(db, item.PurchaseId)
+	editable, errr := tools.IsEditable(db, "purchases", item.PurchaseId, 1*time.Hour)
 	if errr != nil {
 		return responses.InternalServerError(c, "Failed to retrieve purchase timestamp", errr)
 	}

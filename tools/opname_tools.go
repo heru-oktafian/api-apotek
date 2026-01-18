@@ -13,6 +13,23 @@ import (
 	"gorm.io/gorm"
 )
 
+func IsEditable(db *gorm.DB, tableName string, recordID string, times time.Duration) (bool, error) {
+	var createdAt time.Time
+	err := db.Table(tableName).
+		Select("created_at").
+		Where("id = ?", recordID).
+		Scan(&createdAt).Error
+	if err != nil {
+		return false, err
+	}
+
+	if time.Since(createdAt) >= times {
+		return false, nil
+	}
+
+	return true, nil
+}
+
 // AutoCleanupOpnames will delete any opnames older than 2 hours without opname items
 func AutoCleanupOpnames(db *gorm.DB) error {
 	var opnames []models.Opnames

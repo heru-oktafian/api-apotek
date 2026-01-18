@@ -148,3 +148,32 @@ func DeleteDefecta(c *framework.Ctx) error {
 	// Kembalikan respons sukses
 	return responses.JSONResponse(c, http.StatusOK, "Defecta deleted successfully", nil)
 }
+
+func CreateDefectaItem(c *framework.Ctx) error {
+
+	db := config.DB
+
+	var input models.DefectaInputItem
+	if err := c.BodyParser(&input); err != nil {
+		return responses.BadRequest(c, "Invalid Input", nil)
+	}
+
+	generatedID := helpers.GenerateID("DFI")
+
+	defectaItem := models.DefectaItems{
+		ID:        generatedID,
+		DefectaId: input.DefectaId,
+		ProductId: input.ProductId,
+		UnitId:    input.UnitId,
+		Price:     input.Price,
+		Qty:       input.Qty,
+		SubTotal:  input.Price * input.Qty,
+	}
+
+	// Simpan defecta item ke database
+	if err := db.Create(&defectaItem).Error; err != nil {
+		return responses.InternalServerError(c, "Failed to create defecta item", nil)
+	}
+
+	return responses.JSONResponse(c, http.StatusOK, "Defecta item created successfully", defectaItem)
+}

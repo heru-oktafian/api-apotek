@@ -18,10 +18,21 @@ type DefectaItems struct {
 	ID        string `gorm:"type:varchar(15);primaryKey" json:"id"`
 	DefectaId string `gorm:"type:varchar(15);not null" json:"defecta_id" validate:"required"`
 	ProductId string `gorm:"type:varchar(15);not null" json:"product_id" validate:"required"`
-	UnitId    string `gorm:"type:varchar(15);not null;default:'UNT250118123203'" json:"unit_id" validate:"required"`
+	UnitId    string `gorm:"type:varchar(15);not null" json:"unit_id" validate:"required"`
 	Price     int    `gorm:"type:int;not null;default:0" json:"price" validate:"required"`
 	Qty       int    `gorm:"type:int;not null;default:0" json:"qty" validate:"required"`
 	SubTotal  int    `gorm:"type:int;not null;default:0" json:"sub_total" validate:"required"`
+}
+
+// All Defecta Items model
+type AllDefectaItems struct {
+	ID          string `gorm:"type:varchar(15);primaryKey" json:"id"`
+	DefectaId   string `gorm:"type:varchar(15);not null" json:"defecta_id" validate:"required"`
+	ProductName string `gorm:"type:varchar(100);not null" json:"product_name" validate:"required"`
+	UnitName    string `gorm:"type:varchar(50);not null" json:"unit_name" validate:"required"`
+	Price       int    `gorm:"type:int;not null;default:0" json:"price" validate:"required"`
+	Qty         int    `gorm:"type:int;not null;default:0" json:"qty" validate:"required"`
+	SubTotal    int    `gorm:"type:int;not null;default:0" json:"sub_total" validate:"required"`
 }
 
 // Struct baru untuk menangani input defecta, khususnya defecta_date sebagai string

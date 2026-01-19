@@ -72,6 +72,8 @@ func main() {
 		&models.Product{},
 		&models.PurchaseItems{},
 		&models.Purchases{},
+		&models.Defectas{},
+		&models.DefectaItems{},
 		&models.SaleItems{},
 		&models.Sales{},
 		&models.SupplierCategory{},
@@ -126,6 +128,8 @@ func main() {
 	routes.SysMemberRoutes(app)
 	routes.SysDashboardRoutes(app)
 	routes.SysReportRoutes(app)
+	routes.SysDefectaRoutes(app)
+	routes.SysDefectaItemRoutes(app)
 	routes.DailyAssetRoutes(app)
 	routes.AuditFirstStockRoutes(app)
 	routes.AuditFirstStockWithItems(app)

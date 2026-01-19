@@ -1,7 +1,10 @@
 package controllers
 
 import (
+	"math"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/heru-oktafian/api-apotek/models"
@@ -160,6 +163,24 @@ func CreateDefectaItem(c *framework.Ctx) error {
 
 	generatedID := helpers.GenerateID("DFI")
 
+	// Cek apakah product_id sudah ada dalam defecta_items dengan defecta_id yang sama
+	var existingItem models.DefectaItems
+	result := db.Where("defecta_id = ? AND product_id = ?", input.DefectaId, input.ProductId).First(&existingItem)
+
+	if result.Error == nil {
+		// Item sudah ada, update qty
+		existingItem.Qty += input.Qty
+		existingItem.SubTotal = existingItem.Price * existingItem.Qty
+
+		if err := db.Save(&existingItem).Error; err != nil {
+			return responses.InternalServerError(c, "Failed to update defecta item", nil)
+		}
+
+		defectaItem := existingItem
+		return responses.JSONResponse(c, http.StatusOK, "Defecta item updated successfully", defectaItem)
+	}
+
+	// Item belum ada, buat item baru
 	defectaItem := models.DefectaItems{
 		ID:        generatedID,
 		DefectaId: input.DefectaId,
@@ -176,4 +197,209 @@ func CreateDefectaItem(c *framework.Ctx) error {
 	}
 
 	return responses.JSONResponse(c, http.StatusOK, "Defecta item created successfully", defectaItem)
+}
+
+// UpdateDefectaItem menangani pembaruan item defecta yang sudah ada.
+func UpdateDefectaItem(c *framework.Ctx) error {
+	db := config.DB
+	id := c.Param("id")
+
+	var input models.DefectaInputItem
+	if err := c.BodyParser(&input); err != nil {
+		return responses.BadRequest(c, "Invalid Input", nil)
+	}
+
+	// Cek apakah defecta item dengan ID tersebut ada
+	var defectaItem models.DefectaItems
+	if err := db.First(&defectaItem, "id = ?", id).Error; err != nil {
+		return responses.NotFound(c, "Defecta item not found")
+	}
+
+	// Perbarui field-field defecta item
+	defectaItem.ProductId = input.ProductId
+	if input.UnitId != "" {
+		defectaItem.UnitId = input.UnitId
+	}
+	if input.Price != 0 {
+		defectaItem.Price = input.Price
+	}
+	defectaItem.Qty = input.Qty
+	defectaItem.SubTotal = input.Price * input.Qty
+
+	// Simpan perubahan ke database
+	if err := db.Save(&defectaItem).Error; err != nil {
+		return responses.InternalServerError(c, "Failed to update defecta item", nil)
+	}
+
+	// Kembalikan respons sukses
+	return responses.JSONResponse(c, http.StatusOK, "Defecta item updated successfully", defectaItem)
+}
+
+// DeleteDefectaItem menangani penghapusan item defecta yang ada.
+func DeleteDefectaItem(c *framework.Ctx) error {
+	db := config.DB
+	id := c.Param("id")
+
+	// Cek apakah defecta item dengan ID tersebut ada
+	var defectaItem models.DefectaItems
+	if err := db.First(&defectaItem, "id = ?", id).Error; err != nil {
+		return responses.NotFound(c, "Defecta item not found")
+	}
+
+	// Hapus defecta item dari database
+	if err := db.Delete(&defectaItem).Error; err != nil {
+		return responses.InternalServerError(c, "Failed to delete defecta item", nil)
+	}
+
+	// Kembalikan respons sukses
+	return responses.JSONResponse(c, http.StatusOK, "Defecta item deleted successfully", nil)
+}
+
+func GetAllDefectas(c *framework.Ctx) error {
+	// Dapatkan waktu sekarang di WIB
+	nowWIB := time.Now().In(utils.Location)
+
+	// Ambil informasi dari token melalui middleware
+	branchID, _ := middlewares.GetBranchID(c.Request)
+
+	// Ambil parameter query dan search dari query URL
+	pageParam := c.Query("page")
+	search := strings.TrimSpace(c.Query("search"))
+
+	page := 1
+	if p, err := strconv.Atoi(pageParam); err == nil && p > 0 {
+		page = p
+	}
+
+	limit := 10                  // Tetapkan limit ke 10 data per halaman
+	offset := (page - 1) * limit // Hitung offset berdasarkan halaman dan limit
+
+	month := strings.TrimSpace(c.Query("month"))
+
+	// Jika month kosong, isi dengan bulan ini (format YYYY-MM)
+	if month == "" {
+		month = nowWIB.Format("2006-01")
+	}
+
+	// Inisialisasi slice untuk menampung defectas dan variabel total
+	var defectas []models.Defectas
+	var total int64
+
+	// Bangun query dasar
+	query := config.DB.Table("defectas df").
+		Select("df.id, df.defecta_date, df.total_estimate, df.defecta_status").
+		Where("df.branch_id = ?", branchID)
+
+	// Filter berdasarkan bulan
+	startDate, err := time.Parse("2006-01", month)
+	if err != nil {
+		return responses.BadRequest(c, "Invalid month format. Use YYYY-MM", nil)
+	}
+	endDate := startDate.AddDate(0, 1, 0)
+	query = query.Where("df.defecta_date >= ? AND df.defecta_date < ?", startDate, endDate)
+
+	// Terapkan pencarian jika ada
+	if search != "" {
+		likeSearch := "%" + search + "%"
+		query = query.Where("df.id LIKE ? OR df.defecta_status LIKE ?", likeSearch, likeSearch)
+	}
+
+	// Hitung total data untuk pagination
+	if err := query.Count(&total).Error; err != nil {
+		return responses.InternalServerError(c, "Failed to count defectas", nil)
+	}
+
+	// Ambil data dengan pagination
+	if err := query.Order("df.created_at DESC").Limit(limit).Offset(offset).Find(&defectas).Error; err != nil {
+		return responses.InternalServerError(c, "Failed to fetch defectas", nil)
+	}
+
+	// Hitung total halaman
+	totalPages := int(math.Ceil(float64(total) / float64(limit)))
+
+	// Format data defectas sebelum dikirimkan dalam respons
+	var formattedDefectas []models.DefectaDetailResponse
+	for _, d := range defectas {
+		formattedDefectas = append(formattedDefectas, models.DefectaDetailResponse{
+			ID:            d.ID,
+			DefectaDate:   utils.FormatIndonesianDate(d.DefectaDate),
+			TotalEstimate: d.TotalEstimate,
+			DefectaStatus: string(d.DefectaStatus),
+		})
+	}
+
+	// Siapkan data respons dengan pagination
+	return responses.JSONResponseGetAll(c, http.StatusOK, "Defectas retrieved successfully", search, int(total), page, totalPages, limit, formattedDefectas)
+}
+
+// GetAllDefectaItems menangani pengambilan semua item defecta untuk defecta tertentu.
+func GetAllDefectaItems(c *framework.Ctx) error {
+	// Ambil parameter defectaID dari URL
+	defectaID := c.Param("id")
+
+	// Inisialisasi slice untuk menampung defecta items
+	var defectaItems []models.AllDefectaItems
+
+	// Bangun query untuk mengambil defecta items beserta nama produk dan unitnya
+	query := config.DB.Table("defecta_items di").
+		Select("di.id, di.defecta_id, pro.name as product_name, un.name as unit_name, di.price, di.qty, di.sub_total").
+		Joins("LEFT JOIN products pro ON pro.id = di.product_id").
+		Joins("LEFT JOIN units un ON un.id = pro.unit_id").
+		Where("di.defecta_id = ?", defectaID)
+
+	// Eksekusi query
+	if err := query.Find(&defectaItems).Error; err != nil {
+		return responses.InternalServerError(c, "Failed to fetch defecta items", nil)
+	}
+
+	// Kembalikan respons sukses dengan data defecta items
+	return responses.JSONResponse(c, http.StatusOK, "Defecta items retrieved successfully", defectaItems)
+}
+
+func GetDefetaWithItems(c *framework.Ctx) error {
+	defectaID := c.Param("id")
+	db := config.DB
+
+	// Ambil data defecta
+	var defecta models.Defectas
+	if err := db.First(&defecta, "id = ?", defectaID).Error; err != nil {
+		return responses.NotFound(c, "Defecta not found")
+	}
+
+	// Ambil data item defecta beserta nama produk dan unitnya
+	var defectaItems []models.AllDefectaItems
+	if err := db.Table("defecta_items di").
+		Select("di.id, di.defecta_id, pro.name as product_name, un.name as unit_name, di.price, di.qty, di.sub_total").
+		Joins("LEFT JOIN products pro ON pro.id = di.product_id").
+		Joins("LEFT JOIN units un ON un.id = pro.unit_id").
+		Where("di.defecta_id = ?", defecta.ID).
+		Find(&defectaItems).Error; err != nil {
+		return responses.InternalServerError(c, "Failed to fetch defecta items", nil)
+	}
+
+	var formatedDefectaItems []models.AllDefectaItems
+	for _, item := range defectaItems {
+		formatedDefectaItems = append(formatedDefectaItems, models.AllDefectaItems{
+			ID:          item.ID,
+			DefectaId:   item.DefectaId,
+			ProductName: item.ProductName,
+			UnitName:    item.UnitName,
+			Price:       item.Price,
+			Qty:         item.Qty,
+			SubTotal:    item.SubTotal,
+		})
+	}
+
+	formatedDefetaDate := utils.FormatIndonesianDate(defecta.DefectaDate)
+
+	// Siapkan respons dengan detail defecta dan itemnya
+	response := models.DefectaDetailWithItemsResponse{
+		ID:            defecta.ID,
+		DefectaDate:   formatedDefetaDate,
+		TotalEstimate: defecta.TotalEstimate,
+		DefectaStatus: string(defecta.DefectaStatus),
+		Items:         formatedDefectaItems,
+	}
+
+	return responses.JSONResponse(c, http.StatusOK, "Defecta details retrieved successfully", response)
 }

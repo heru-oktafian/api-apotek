@@ -145,8 +145,8 @@ func AssetCounter(db *gorm.DB) error {
 		}
 
 		dailyAsset := models.DailyAsset{
-			ID: helpers.GenerateID("AST"),
-			// AssetDate:    time.Now(),
+			ID:           helpers.GenerateID("AST"),
+			AssetDate:    time.Now(),
 			AssetValue:   finalAsset,
 			AssetAverage: assetAverage,
 			BranchId:     asset.BranchID,
